@@ -11,7 +11,18 @@ export const dynamic = "force-dynamic";
 export default async function RevealPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = await params;
   if (matchId === "demo") {
-    const stats = { playerAType: "human" as const, playerBType: "ai" as const, audienceAccuracyPercent: 64, correctVotes: 60, playerAIsAiPercent: 36, playerBIsAiPercent: 64, totalVotes: 94 };
+    const stats = {
+      playerAType: "human" as const,
+      playerBType: "ai" as const,
+      audienceAccuracyPercent: 64,
+      correctVotes: 60,
+      playerAIsAiPercent: 36,
+      playerBIsAiPercent: 64,
+      totalVotes: 94,
+      playerAWrongGuesses: 34,
+      playerBWrongGuesses: 28,
+      deceptionWinner: "player_a" as const
+    };
 
     return (
       <AppShell>

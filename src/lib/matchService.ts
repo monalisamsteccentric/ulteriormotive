@@ -1,4 +1,4 @@
-import { ControlType, Message, PlayerRole, PrivateMatch, PublicMatch, RevealStats } from "@/types/database";
+import { ControlType, Message, PlayerRole, PrivateMatch, PublicMatch, RevealStats, VoteChoice } from "@/types/database";
 import { createAiReplyResult, replyDelayMs } from "./aiPlayer";
 import { supabaseAdmin } from "./supabaseServer";
 import { cleanMessage, createInviteCode, validateMessage } from "./utils";
@@ -287,9 +287,84 @@ function cleanAiStrategy(input?: string) {
 
 export async function getRevealStats(matchId: string): Promise<RevealStats> {
   const supabase = supabaseAdmin();
-  const { data, error } = await supabase.rpc("get_reveal_stats", { p_match_id: matchId });
-  if (error) throw error;
-  return data as RevealStats;
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("player_a_control_type, player_b_control_type, status")
+    .eq("id", matchId)
+    .single();
+  if (matchError) throw matchError;
+  if (!match || (match.status !== "revealed" && match.status !== "completed")) {
+    throw new Error("Match is not revealed");
+  }
+
+  const playerAType = match.player_a_control_type as ControlType | null;
+  const playerBType = match.player_b_control_type as ControlType | null;
+  if (!playerAType || !playerBType) throw new Error("Player identities are missing.");
+
+  const { data: votes, error: votesError } = await supabase
+    .from("votes")
+    .select("vote")
+    .eq("match_id", matchId);
+  if (votesError) throw votesError;
+
+  return buildRevealStats({
+    playerAType,
+    playerBType,
+    votes: ((votes ?? []) as { vote: VoteChoice }[]).map((row) => row.vote)
+  });
+}
+
+function buildRevealStats({
+  playerAType,
+  playerBType,
+  votes
+}: {
+  playerAType: ControlType;
+  playerBType: ControlType;
+  votes: VoteChoice[];
+}): RevealStats {
+  const totalVotes = votes.length;
+  let correctVotes = 0;
+  let playerAIsAiVotes = 0;
+  let playerBIsAiVotes = 0;
+  let playerAWrongGuesses = 0;
+  let playerBWrongGuesses = 0;
+
+  for (const vote of votes) {
+    const guessedAType: ControlType = vote === "player_a_ai" || vote === "both_ai" ? "ai" : "human";
+    const guessedBType: ControlType = vote === "player_b_ai" || vote === "both_ai" ? "ai" : "human";
+
+    if (guessedAType === "ai") playerAIsAiVotes += 1;
+    if (guessedBType === "ai") playerBIsAiVotes += 1;
+    if (guessedAType !== playerAType) playerAWrongGuesses += 1;
+    if (guessedBType !== playerBType) playerBWrongGuesses += 1;
+    if (guessedAType === playerAType && guessedBType === playerBType) correctVotes += 1;
+  }
+
+  const deceptionWinner =
+    playerAWrongGuesses > playerBWrongGuesses
+      ? "player_a"
+      : playerBWrongGuesses > playerAWrongGuesses
+        ? "player_b"
+        : "tie";
+
+  return {
+    playerAType,
+    playerBType,
+    audienceAccuracyPercent: percent(correctVotes, totalVotes),
+    correctVotes,
+    totalVotes,
+    playerAIsAiPercent: percent(playerAIsAiVotes, totalVotes),
+    playerBIsAiPercent: percent(playerBIsAiVotes, totalVotes),
+    playerAWrongGuesses,
+    playerBWrongGuesses,
+    deceptionWinner
+  };
+}
+
+function percent(value: number, total: number) {
+  if (!total) return 0;
+  return Math.round((100 * value) / total);
 }
 
 export async function requestReveal(input: { matchId: string; userId: string }) {

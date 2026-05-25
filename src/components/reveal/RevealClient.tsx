@@ -7,6 +7,12 @@ import { RevealStats } from "@/types/database";
 
 export function RevealClient({ stats, replayHref }: { stats: RevealStats; replayHref: string }) {
   const [count, setCount] = useState(3);
+  const winnerLabel =
+    stats.deceptionWinner === "player_a"
+      ? "Player A won"
+      : stats.deceptionWinner === "player_b"
+        ? "Player B won"
+        : "It is a tie";
 
   useEffect(() => {
     if (count === 0) return;
@@ -15,7 +21,7 @@ export function RevealClient({ stats, replayHref }: { stats: RevealStats; replay
   }, [count]);
 
   async function share() {
-    const text = `Ulterior Motive reveal: audience accuracy ${stats.audienceAccuracyPercent}%.`;
+    const text = `Ulterior Motive reveal: ${winnerLabel}. Audience accuracy ${stats.audienceAccuracyPercent}%.`;
     if (navigator.share) await navigator.share({ text, url: window.location.href });
     else await navigator.clipboard.writeText(`${text} ${window.location.href}`);
   }
@@ -29,6 +35,13 @@ export function RevealClient({ stats, replayHref }: { stats: RevealStats; replay
       <h1 className="animate-glitch text-center text-3xl font-black text-shock">IDENTITIES UNLOCKED</h1>
       <RevealCard label="Player A" value={stats.playerAType.toUpperCase()} />
       <RevealCard label="Player B" value={stats.playerBType.toUpperCase()} />
+      <section className="rounded-lg border border-line bg-ink p-5">
+        <p className="text-sm font-black uppercase text-mist">Deception winner</p>
+        <p className="text-4xl font-black text-shock">{winnerLabel}</p>
+        <p className="mt-2 text-sm font-bold leading-6 text-mist">
+          Player A fooled {stats.playerAWrongGuesses} voters. Player B fooled {stats.playerBWrongGuesses} voters.
+        </p>
+      </section>
       <section className="rounded-lg border border-line bg-ink p-5">
         <p className="text-sm font-black uppercase text-mist">Audience accuracy</p>
         <p className="text-4xl font-black text-neon">{stats.audienceAccuracyPercent}%</p>

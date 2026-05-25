@@ -58,4 +58,7 @@ export type RevealStats = VoteStats & {
   playerBType: ControlType;
   audienceAccuracyPercent: number;
   correctVotes: number;
+  playerAWrongGuesses: number;
+  playerBWrongGuesses: number;
+  deceptionWinner: PlayerRole | "tie";
 };
