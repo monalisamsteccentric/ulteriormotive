@@ -1,13 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Chrome } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 export function AuthForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("Guest");
@@ -15,27 +13,28 @@ export function AuthForm() {
 
   async function auth(mode: "login" | "signup") {
     const supabase = supabaseClient();
+    const trimmedUsername = username.trim() || "Guest";
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({ email, password, options: { data: { name: trimmedUsername } } });
     if (result.error) {
       setError(result.error.message);
       return;
     }
     const user = result.data.user;
     if (user) {
-      await supabase.from("profiles").upsert({ id: user.id, username, avatar_url: null });
+      await supabase.from("profiles").upsert({ id: user.id, username: trimmedUsername, avatar_url: null });
       localStorage.setItem("hidden_user_id", user.id);
-      localStorage.setItem("hidden_username", username);
+      localStorage.setItem("hidden_username", trimmedUsername);
     }
-    router.push("/");
+    window.location.replace("/");
   }
 
   async function googleAuth() {
     const supabase = supabaseClient();
     setError("");
-    localStorage.setItem("hidden_username", username);
+    localStorage.setItem("hidden_username", username.trim() || "Guest");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -48,8 +47,8 @@ export function AuthForm() {
   function guest() {
     const id = localStorage.getItem("hidden_user_id") ?? crypto.randomUUID();
     localStorage.setItem("hidden_user_id", id);
-    localStorage.setItem("hidden_username", username);
-    router.push("/");
+    localStorage.setItem("hidden_username", username.trim() || "Guest");
+    window.location.replace("/");
   }
 
   return (

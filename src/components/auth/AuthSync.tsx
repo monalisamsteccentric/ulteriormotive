@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 export function AuthSync() {
-  const router = useRouter();
-
   useEffect(() => {
     async function syncUser() {
       const supabase = supabaseClient();
@@ -14,21 +11,28 @@ export function AuthSync() {
       const user = data.user;
 
       if (user) {
+        const storedUsername = localStorage.getItem("hidden_username")?.trim();
+        const metadataUsername = user.user_metadata?.name || user.user_metadata?.full_name;
         const username =
-          localStorage.getItem("hidden_username") ||
-          user.user_metadata?.name ||
-          user.user_metadata?.full_name ||
+          storedUsername && storedUsername !== "Guest"
+            ? storedUsername
+            : metadataUsername ||
           user.email?.split("@")[0] ||
           "Guest";
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          username,
+          avatar_url: user.user_metadata?.avatar_url ?? null
+        });
         localStorage.setItem("hidden_user_id", user.id);
         localStorage.setItem("hidden_username", username);
       }
 
-      router.replace("/");
+      window.location.replace("/");
     }
 
     syncUser();
-  }, [router]);
+  }, []);
 
   return (
     <section className="rounded-lg border border-line bg-ink p-4">

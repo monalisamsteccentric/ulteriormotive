@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
+import { PublicMatch } from "@/types/database";
 
 type RevealRequestPanelProps = {
   matchId: string;
@@ -35,6 +36,24 @@ export function RevealRequestPanel({
   const [now, setNow] = useState(initialNow);
   const [requestedTimeLabel, setRequestedTimeLabel] = useState("");
 
+  const syncMatchStatus = useCallback(async () => {
+    const response = await fetch(`/api/matches/${matchId}`, { cache: "no-store" });
+    if (!response.ok) return;
+
+    const match = (await response.json()) as PublicMatch;
+    if (match.status === "revealed" || match.status === "completed") {
+      router.push(`/match/${matchId}/reveal`);
+      return;
+    }
+
+    if (
+      match.reveal_requested_by_user_id !== revealRequestedByUserId ||
+      match.reveal_requested_at !== revealRequestedAt
+    ) {
+      router.refresh();
+    }
+  }, [matchId, revealRequestedAt, revealRequestedByUserId, router]);
+
   useEffect(() => {
     setUserId(localStorage.getItem("hidden_user_id"));
   }, []);
@@ -60,14 +79,19 @@ export function RevealRequestPanel({
     const channel = supabase
       .channel(`matches:${matchId}`)
       .on("broadcast", { event: "updated" }, () => {
-        router.refresh();
+        syncMatchStatus();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [matchId, router]);
+  }, [matchId, syncMatchStatus]);
+
+  useEffect(() => {
+    const id = window.setInterval(syncMatchStatus, 3000);
+    return () => window.clearInterval(id);
+  }, [syncMatchStatus]);
 
   useEffect(() => {
     if (status === "revealed" || status === "completed") {
