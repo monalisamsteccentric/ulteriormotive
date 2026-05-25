@@ -3,6 +3,7 @@
 .next/
 node_modules/
 tsconfig.tsbuildinfo
+AWS_LAMBDA_HOSTING.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
