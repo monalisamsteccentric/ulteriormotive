@@ -158,7 +158,7 @@ export function RealtimeChat({
     <section className="flex min-h-[56dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink">
       <div className="border-b border-line bg-panel px-3 py-3">
         <p className="text-xs font-black uppercase text-mist">You are {roleLabel(role)}</p>
-        <p className="mt-1 text-sm font-bold text-white">
+        <p className="mt-1 text-base font-bold leading-7 text-white sm:text-sm sm:leading-normal">
           {role === "audience"
             ? playerAIsAi && playerBIsAi
               ? "Both seats are AI-controlled. Watch the bots talk, vote, and reveal when ready."
@@ -179,7 +179,7 @@ export function RealtimeChat({
         <div ref={bottomRef} />
       </div>
       {role === "audience" ? (
-        <div className="border-t border-line bg-void/95 p-3 text-sm font-bold text-mist">
+        <div className="border-t border-line bg-void/95 p-3 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-normal">
           Audience mode: watch the players and vote from the suspicion panel.
         </div>
       ) : (
@@ -190,9 +190,9 @@ export function RealtimeChat({
             onChange={(event) => setDraft(event.target.value)}
             placeholder={`Message as ${roleLabel(role)}...`}
             disabled={status === "waiting"}
-            className="min-h-12 flex-1 rounded-lg border border-line bg-panel px-3 text-sm text-white outline-none focus:border-neon"
+            className="min-h-14 flex-1 rounded-lg border border-line bg-panel px-4 text-base text-white outline-none focus:border-neon sm:min-h-12 sm:px-3 sm:text-sm"
           />
-          <button aria-label="Send" disabled={status === "waiting"} className="grid min-h-12 w-12 place-items-center rounded-lg bg-neon text-void disabled:opacity-40">
+          <button aria-label="Send" disabled={status === "waiting"} className="grid min-h-14 w-14 place-items-center rounded-lg bg-neon text-void disabled:opacity-40 sm:min-h-12 sm:w-12">
             <Send size={18} />
           </button>
         </form>
