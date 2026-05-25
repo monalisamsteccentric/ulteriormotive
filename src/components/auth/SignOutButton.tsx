@@ -1,19 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 export function SignOutButton() {
-  const router = useRouter();
-
   async function signOut() {
     const supabase = supabaseClient();
     await supabase.auth.signOut();
     localStorage.removeItem("hidden_user_id");
     localStorage.removeItem("hidden_username");
-    router.refresh();
-    router.push("/");
+    window.location.replace("/");
   }
 
   return (
