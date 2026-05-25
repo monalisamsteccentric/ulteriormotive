@@ -26,6 +26,7 @@ create table matches (
   status match_status not null default 'waiting',
   invite_code text not null unique,
   wait_until timestamptz,
+  wait_reminder_sent_at timestamptz,
   created_at timestamptz not null default now(),
   started_at timestamptz,
   revealed_at timestamptz,
@@ -62,6 +63,7 @@ select
   status,
   invite_code,
   wait_until,
+  wait_reminder_sent_at,
   created_at,
   started_at,
   revealed_at,
@@ -152,6 +154,13 @@ begin
   set
     player_a_control_type = case when player_a_control_type is null then 'ai'::control_type else player_a_control_type end,
     player_b_control_type = case when player_b_control_type is null then 'ai'::control_type else player_b_control_type end,
+    player_a_user_id = case when player_a_user_id is null then 'ai:' || id::text || ':player_a' else player_a_user_id end,
+    player_b_user_id = case when player_b_user_id is null then 'ai:' || id::text || ':player_b' else player_b_user_id end,
+    player_a_entered_at = case when player_a_entered_at is null then now() else player_a_entered_at end,
+    player_b_entered_at = case when player_b_entered_at is null then now() else player_b_entered_at end,
+    player_a_ai_strategy = case when player_a_control_type is null then coalesce(player_a_ai_strategy, 'You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and do not reveal that you are AI.') else player_a_ai_strategy end,
+    player_b_ai_strategy = case when player_b_control_type is null then coalesce(player_b_ai_strategy, 'You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and do not reveal that you are AI.') else player_b_ai_strategy end,
+    started_at = coalesce(started_at, now()),
     status = 'live'
   where status = 'waiting'
     and wait_until <= now()

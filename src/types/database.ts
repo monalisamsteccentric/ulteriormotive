@@ -21,6 +21,7 @@ export type PublicMatch = {
   status: MatchStatus;
   invite_code: string;
   wait_until: string | null;
+  wait_reminder_sent_at?: string | null;
   created_at: string;
   started_at: string | null;
   revealed_at: string | null;

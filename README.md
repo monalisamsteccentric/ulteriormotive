@@ -34,6 +34,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+CRON_SECRET=
+RESEND_API_KEY=
+WAITING_MATCH_ALERT_EMAIL=monalisa.sahoo.jsr@gmail.com
+WAITING_MATCH_EMAIL_FROM=Ulterior Motive <onboarding@resend.dev>
 ```
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
@@ -57,7 +62,17 @@ Normal UI reads from `public_matches`, which returns those fields as `null` unti
 
 ## Wait Timer
 
-Run `inject_expired_ai_opponents()` every minute using Supabase Scheduled Functions, pg_cron, or a Vercel cron endpoint. It silently fills any empty seat with AI after `wait_until`, then starts the match.
+Run `supabase/add_wait_reminder_and_ai_fallback.sql` if you already created the database before this feature existed.
+
+Vercel cron calls `GET /api/cron/waiting-matches` every minute. The route:
+
+- Emails `WAITING_MATCH_ALERT_EMAIL` when a waiting match has about one minute left.
+- Includes the match ID, invite code, and join link.
+- Fills the empty seat with AI after `wait_until`, then starts the match.
+
+Email uses Resend. Add `RESEND_API_KEY` and set `WAITING_MATCH_EMAIL_FROM` to a verified sender for production. If `RESEND_API_KEY` is missing, the cron still assigns AI after expiry but skips email.
+
+The fallback AI prompt lives in `DEFAULT_EXPIRED_WAIT_AI_STRATEGY` in `src/lib/matchService.ts`.
 
 ## AI Players
 

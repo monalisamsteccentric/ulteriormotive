@@ -5,6 +5,16 @@ import { cleanMessage, createInviteCode, validateMessage } from "./utils";
 
 const aiTurnLocks = new Map<string, Promise<unknown>>();
 const MIN_REVEAL_MS = 2 * 60 * 1000;
+const WAIT_REMINDER_MS = 60 * 1000;
+const WAITING_MATCH_ALERT_EMAIL = process.env.WAITING_MATCH_ALERT_EMAIL || "monalisa.sahoo.jsr@gmail.com";
+
+// Edit this when you want the auto-filled AI opponent to use a different default personality.
+export const DEFAULT_EXPIRED_WAIT_AI_STRATEGY =
+  "You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and do not reveal that you are AI.";
+
+type WaitingMatchRow = PrivateMatch & {
+  wait_reminder_sent_at: string | null;
+};
 
 async function withAiTurnLock<T>(matchId: string, task: () => Promise<T>) {
   const current = aiTurnLocks.get(matchId);
@@ -112,11 +122,166 @@ export async function injectAiIfExpired(matchId: string) {
   if (error) throw error;
   if (!match || match.status !== "waiting" || new Date(match.wait_until).getTime() > Date.now()) return;
 
-  const update = !match.player_a_user_id
-    ? { player_a_control_type: "ai", status: "live" }
-    : { player_b_control_type: "ai", status: "live" };
+  await fillEmptySeatWithAi(match as WaitingMatchRow);
+}
 
-  await supabase.from("matches").update(update).eq("id", matchId);
+export async function injectAiIntoOpenSeat(matchId: string) {
+  const supabase = supabaseAdmin();
+  const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (error) throw error;
+  if (!match || match.status !== "waiting") return false;
+  return fillEmptySeatWithAi(match as WaitingMatchRow, { ignoreWaitTimer: true });
+}
+
+export async function processWaitingMatches() {
+  const supabase = supabaseAdmin();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const reminderCutoffIso = new Date(now + WAIT_REMINDER_MS).toISOString();
+
+  const { data: reminderMatches, error: reminderError } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("status", "waiting")
+    .is("wait_reminder_sent_at", null)
+    .gt("wait_until", nowIso)
+    .lte("wait_until", reminderCutoffIso)
+    .or("player_a_user_id.is.null,player_b_user_id.is.null");
+  if (reminderError) throw reminderError;
+
+  let remindersSent = 0;
+  let reminderErrors = 0;
+  for (const match of (reminderMatches ?? []) as WaitingMatchRow[]) {
+    try {
+      const sent = await sendWaitReminderEmail(match);
+      await supabase
+        .from("matches")
+        .update({ wait_reminder_sent_at: new Date().toISOString() })
+        .eq("id", match.id)
+        .is("wait_reminder_sent_at", null);
+      if (sent) remindersSent += 1;
+    } catch (error) {
+      reminderErrors += 1;
+      console.error("Waiting match reminder failed", error);
+    }
+  }
+
+  const { data: expiredMatches, error: expiredError } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("status", "waiting")
+    .lte("wait_until", nowIso)
+    .or("player_a_user_id.is.null,player_b_user_id.is.null");
+  if (expiredError) throw expiredError;
+
+  let aiAssigned = 0;
+  for (const match of (expiredMatches ?? []) as WaitingMatchRow[]) {
+    const filled = await fillEmptySeatWithAi(match);
+    if (filled) aiAssigned += 1;
+  }
+
+  return {
+    remindersChecked: reminderMatches?.length ?? 0,
+    remindersSent,
+    reminderErrors,
+    aiAssigned
+  };
+}
+
+async function fillEmptySeatWithAi(match: WaitingMatchRow, options: { ignoreWaitTimer?: boolean } = {}) {
+  if (match.status !== "waiting") return false;
+  if (!options.ignoreWaitTimer && match.wait_until && new Date(match.wait_until).getTime() > Date.now()) return false;
+  if (match.player_a_user_id && match.player_b_user_id) return false;
+
+  const nowIso = new Date().toISOString();
+  const update =
+    !match.player_a_user_id
+      ? {
+          player_a_user_id: `ai:${match.id}:player_a`,
+          player_a_entered_at: nowIso,
+          player_a_control_type: "ai" as const,
+          player_a_ai_strategy: match.player_a_ai_strategy || DEFAULT_EXPIRED_WAIT_AI_STRATEGY,
+          status: "live" as const,
+          started_at: match.started_at ?? nowIso
+        }
+      : {
+          player_b_user_id: `ai:${match.id}:player_b`,
+          player_b_entered_at: nowIso,
+          player_b_control_type: "ai" as const,
+          player_b_ai_strategy: match.player_b_ai_strategy || DEFAULT_EXPIRED_WAIT_AI_STRATEGY,
+          status: "live" as const,
+          started_at: match.started_at ?? nowIso
+        };
+
+  const supabase = supabaseAdmin();
+  const { data, error } = await supabase
+    .from("matches")
+    .update(update)
+    .eq("id", match.id)
+    .eq("status", "waiting")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return false;
+
+  const liveMatch = data as PrivateMatch;
+  await broadcastMatchUpdate(match.id);
+  await withAiTurnLock(match.id, () => startAiVsAiIfNeeded(liveMatch, true));
+  return true;
+}
+
+async function sendWaitReminderEmail(match: WaitingMatchRow) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.warn("Skipping waiting match reminder email: RESEND_API_KEY is not configured.");
+    return false;
+  }
+
+  const appUrl = getAppUrl();
+  const joinUrl = `${appUrl}/join/${match.invite_code}`;
+  const matchUrl = `${appUrl}/match/${match.id}`;
+  const emptySeat = !match.player_a_user_id ? "Player A" : "Player B";
+  const waitUntil = match.wait_until ? new Date(match.wait_until).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "soon";
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resendApiKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      from: process.env.WAITING_MATCH_EMAIL_FROM || "Ulterior Motive <onboarding@resend.dev>",
+      to: WAITING_MATCH_ALERT_EMAIL,
+      subject: `Ulterior Motive match needs ${emptySeat}`,
+      text: [
+        `A match has about one minute left before AI is assigned.`,
+        ``,
+        `Match ID: ${match.id}`,
+        `Invite code: ${match.invite_code}`,
+        `Empty seat: ${emptySeat}`,
+        `Wait timer ends: ${waitUntil}`,
+        ``,
+        `Join link: ${joinUrl}`,
+        `Match room: ${matchUrl}`,
+        ``,
+        `If nobody joins before the timer ends, the empty seat will be assigned to AI automatically.`
+      ].join("\n")
+    })
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(`Reminder email failed: ${response.status} ${message}`);
+  }
+
+  return true;
+}
+
+function getAppUrl() {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
 }
 
 export async function sendMessage(input: {
