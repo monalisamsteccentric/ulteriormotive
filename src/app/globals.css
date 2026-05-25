@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 16% 20%, rgba(255, 23, 111, 0.38), transparent 34%),
+    radial-gradient(circle at 80% 24%, rgba(255, 99, 71, 0.35), transparent 30%),
+    linear-gradient(135deg, #21071d 0%, #67142b 45%, #d8615d 100%);
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(255, 23, 111, 0.55);
+}
+
+.pink-stage {
+  position: relative;
+}
+
+.pink-stage::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  z-index: -1;
+  border-radius: 48px;
+  background: rgba(255, 255, 255, 0.08);
+  filter: blur(80px);
+}
+
+.phone-frame {
+  position: relative;
+  height: 640px;
+  overflow: hidden;
+  border: 5px solid rgba(255, 255, 255, 0.92);
+  border-radius: 42px;
+  background: #070710;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.phone-frame-mid {
+  height: 700px;
+  background: linear-gradient(180deg, #f71970 0%, #ff5f9d 48%, #ffc3d7 100%);
+}
+
+.phone-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgba(239, 18, 100, 0.16) 60%, rgba(242, 20, 94, 0.92) 100%);
+  pointer-events: none;
+}
+
+.phone-status {
+  position: absolute;
+  top: 17px;
+  left: 22px;
+  right: 22px;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.glass-pill {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+@media (max-width: 760px) {
+  .phone-frame {
+    height: 620px;
+  }
+
+  .phone-frame-mid {
+    height: 650px;
+  }
+}
