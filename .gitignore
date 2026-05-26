@@ -2,6 +2,7 @@
 .env*.local
 .next/
 node_modules/
+supabase/.temp/
 tsconfig.tsbuildinfo
 AWS_LAMBDA_HOSTING.txt
 npm-debug.log*

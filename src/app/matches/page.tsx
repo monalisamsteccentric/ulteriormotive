@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { PublicMatch } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 export default async function MatchesPage() {
-  const { data } = await supabaseAdmin()
+  const supabase = await supabaseServer();
+  const { data } = await supabase
     .from("public_matches")
     .select("*")
     .in("status", ["waiting", "live", "revealed"])

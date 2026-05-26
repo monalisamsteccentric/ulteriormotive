@@ -1,6 +1,6 @@
 import { JoinMatchForm } from "@/components/match/JoinMatchForm";
 import { AppShell } from "@/components/layout/AppShell";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { inviteUrl } from "@/lib/utils";
 import { PublicMatch } from "@/types/database";
 
@@ -16,7 +16,7 @@ export default async function JoinPage({
   const { inviteCode } = await params;
   const { created } = await searchParams;
   const normalizedInviteCode = inviteCode.toUpperCase();
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match } = await supabase
     .from("public_matches")
     .select("*")

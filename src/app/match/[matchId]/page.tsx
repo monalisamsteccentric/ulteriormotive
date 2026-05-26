@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { MatchSharePanel } from "@/components/match/MatchSharePanel";
 import { RevealRequestPanel } from "@/components/match/RevealRequestPanel";
 import { VotePanel } from "@/components/voting/VotePanel";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { voteStats } from "@/lib/voteService";
 import { Message, PublicMatch } from "@/types/database";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MatchPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = await params;
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match } = await supabase.from("public_matches").select("*").eq("id", matchId).maybeSingle();
   const { data: messages } = await supabase.from("public_messages").select("*").eq("match_id", matchId).order("created_at");
 

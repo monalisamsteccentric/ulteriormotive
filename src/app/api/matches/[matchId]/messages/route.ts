@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -12,7 +12,8 @@ function getErrorMessage(error: unknown) {
 export async function GET(_: Request, { params }: { params: Promise<{ matchId: string }> }) {
   try {
     const { matchId } = await params;
-    const { data, error } = await supabaseAdmin()
+    const supabase = await supabaseServer();
+    const { data, error } = await supabase
       .from("public_messages")
       .select("*")
       .eq("match_id", matchId)

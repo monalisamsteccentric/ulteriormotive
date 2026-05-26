@@ -1,5 +1,5 @@
 import { VoteChoice, VoteStats } from "@/types/database";
-import { supabaseAdmin } from "./supabaseServer";
+import { supabaseAdmin, supabaseServer } from "./supabaseServer";
 
 export async function vote(input: { matchId: string; voterUserId: string; vote: VoteChoice }) {
   const supabase = supabaseAdmin();
@@ -15,7 +15,7 @@ export async function vote(input: { matchId: string; voterUserId: string; vote: 
 }
 
 export async function voteStats(matchId: string): Promise<VoteStats> {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase.rpc("get_vote_stats", { p_match_id: matchId });
   if (error) throw error;
   return normalizeVoteStats(data);
