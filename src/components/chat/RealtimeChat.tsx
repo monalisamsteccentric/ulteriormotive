@@ -194,9 +194,9 @@ export function RealtimeChat({
 
   return (
     <section className="flex min-h-[56dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink">
-      <div className="border-b border-line bg-panel px-3 py-3">
-        <p className="text-xs font-black uppercase text-mist">You are {roleLabel(role)}</p>
-        <p className="mt-1 text-base font-bold leading-7 text-white sm:text-sm sm:leading-normal">
+      <div className="border-b border-line bg-panel px-4 py-4 sm:px-3 sm:py-3">
+        <p className="text-sm font-black uppercase text-mist sm:text-xs">You are {roleLabel(role)}</p>
+        <p className="mt-1 text-lg font-bold leading-8 text-white sm:text-sm sm:leading-normal">
           {role === "audience"
             ? playerAIsAi && playerBIsAi
               ? "Both seats are AI-controlled. Watch the bots talk, vote, and reveal when ready."
@@ -205,27 +205,27 @@ export function RealtimeChat({
               ? "Wait for the other seat to fill. You can chat once the match is live."
               : `Send messages as ${roleLabel(role)}. Do not reveal whether you chose human or AI.`}
         </p>
-        {entryError ? <p className="mt-2 text-xs font-black text-shock">{entryError}</p> : null}
+        {entryError ? <p className="mt-2 text-sm font-black text-shock sm:text-xs">{entryError}</p> : null}
       </div>
-      <div ref={chatScrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div ref={chatScrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-3 sm:p-3">
         {messages.map((message) => (
           <ChatBubble key={message.id} message={message} />
         ))}
         <div ref={bottomRef} />
       </div>
       {role === "audience" ? (
-        <div className="border-t border-line bg-void/95 p-3 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-normal">
+        <div className="border-t border-line bg-void/95 p-4 text-lg font-bold leading-8 text-mist sm:p-3 sm:text-sm sm:leading-normal">
           Audience mode: watch the players and vote from the suspicion panel.
         </div>
       ) : (
-        <form onSubmit={send} className="sticky bottom-0 flex gap-2 border-t border-line bg-void/95 p-3">
+        <form onSubmit={send} className="sticky bottom-0 flex gap-2 border-t border-line bg-void/95 p-4 sm:p-3">
           <input
             value={draft}
             maxLength={280}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={`Message as ${roleLabel(role)}...`}
             disabled={status === "waiting"}
-            className="min-h-14 flex-1 rounded-lg border border-line bg-panel px-4 text-base text-white outline-none focus:border-neon sm:min-h-12 sm:px-3 sm:text-sm"
+            className="min-h-14 min-w-0 flex-1 rounded-lg border border-line bg-panel px-4 text-base text-white outline-none focus:border-neon sm:min-h-12 sm:px-3 sm:text-sm"
           />
           <button aria-label="Send" disabled={status === "waiting"} className="grid min-h-14 w-14 place-items-center rounded-lg bg-neon text-void disabled:opacity-40 sm:min-h-12 sm:w-12">
             <Send size={18} />

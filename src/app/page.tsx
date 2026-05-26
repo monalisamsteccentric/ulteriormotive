@@ -7,13 +7,13 @@ export default function HomePage() {
   return (
     <AppShell>
       <section className="mx-auto mb-8 max-w-3xl text-center">
-        <div className="glass-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white">
+        <div className="glass-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.12em] text-white sm:text-xs sm:tracking-[0.18em]">
           Ulterior Motive
         </div>
-        <h1 className="mt-5 text-5xl font-black leading-[0.9] tracking-normal text-white sm:text-7xl lg:text-8xl">
+        <h1 className="mt-5 text-5xl font-black leading-[0.98] tracking-normal text-white sm:text-7xl sm:leading-[0.9] lg:text-8xl">
           Nobody knows who is human.
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-7 text-white/75 sm:text-lg">
+        <p className="mx-auto mt-5 max-w-2xl text-lg font-semibold leading-8 text-white/80 sm:text-lg">
           Player A and Player B stay visible. The human or AI truth stays buried until the reveal.
         </p>
       </section>
@@ -53,7 +53,7 @@ export default function HomePage() {
 
 function HomeAction({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   return (
-    <LinkButton href={href} variant="ghost" className="justify-start gap-3 text-base">
+    <LinkButton href={href} variant="ghost" className="justify-start gap-3 text-lg sm:text-base">
       <span className="text-neon">{icon}</span>
       {label}
     </LinkButton>

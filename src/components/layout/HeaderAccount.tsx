@@ -61,7 +61,7 @@ export function HeaderAccount() {
       <div className="flex items-center gap-2">
         <Link
           href="/profile"
-          className="glass-pill inline-flex min-h-10 max-w-[11rem] items-center gap-2 rounded-full px-3 py-1 text-sm font-bold text-white/90 sm:max-w-none sm:text-xs"
+          className="glass-pill inline-flex min-h-11 max-w-[10rem] items-center gap-2 rounded-full px-3 py-1 text-sm font-bold text-white/90 sm:min-h-10 sm:max-w-none sm:text-xs"
         >
           <UserRound size={14} />
           <span className="truncate">{account.displayName}</span>
@@ -74,7 +74,7 @@ export function HeaderAccount() {
   return (
     <Link
       href="/login"
-      className="glass-pill inline-flex min-h-10 items-center gap-2 rounded-full px-3 py-1 text-sm font-bold text-white/90 sm:text-xs"
+      className="glass-pill inline-flex min-h-11 items-center gap-2 rounded-full px-3 py-1 text-sm font-bold text-white/90 sm:min-h-10 sm:text-xs"
     >
       <LogIn size={14} />
       Login / Sign up

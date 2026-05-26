@@ -22,7 +22,7 @@ export function JoinByCodeForm() {
   return (
     <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-ink p-4">
       <label className="block">
-        <span className="text-xs font-black uppercase text-mist">Match ID</span>
+        <span className="text-sm font-black uppercase text-mist sm:text-xs">Match ID</span>
         <input
           value={inviteCode}
           onChange={(event) => {
@@ -35,7 +35,7 @@ export function JoinByCodeForm() {
           className="mt-2 w-full rounded-lg border border-line bg-panel px-4 py-3 text-lg font-black uppercase tracking-[0.18em] text-white outline-none focus:border-neon"
         />
       </label>
-      {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
+      {error ? <p className="text-base font-bold text-shock sm:text-sm">{error}</p> : null}
       <Button type="submit" className="w-full">Join match</Button>
     </form>
   );

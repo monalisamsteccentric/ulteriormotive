@@ -61,13 +61,13 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
       <section className="mb-3 rounded-lg border border-line bg-ink p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase text-mist">Match status</p>
+            <p className="text-sm font-black uppercase text-mist sm:text-xs">Match status</p>
             <p className={`mt-1 text-2xl font-black ${isWaiting ? "text-neon" : "text-shock"}`}>
               {statusLabel}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-xs font-black uppercase text-mist">Invite code</p>
+          <div className="text-left sm:text-right">
+            <p className="text-sm font-black uppercase text-mist sm:text-xs">Invite code</p>
             <p className="mt-1 text-xl font-black text-white">{safeMatch.invite_code}</p>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
 function MatchSeat({ label, filled, entered }: { label: string; filled: boolean; entered: boolean }) {
   return (
     <div className={`rounded-lg border p-3 ${entered ? "border-neon bg-neon/10" : filled ? "border-line bg-panel" : "border-line bg-panel/70"}`}>
-      <p className="text-xs font-black uppercase text-mist">{label}</p>
+      <p className="text-sm font-black uppercase text-mist sm:text-xs">{label}</p>
       <p className="mt-1 text-lg font-black text-white">{entered ? "In chatroom" : filled ? "Seat filled" : "Waiting"}</p>
     </div>
   );

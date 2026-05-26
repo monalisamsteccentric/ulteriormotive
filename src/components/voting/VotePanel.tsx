@@ -124,10 +124,10 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
     <section className="rounded-lg border border-line bg-ink p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black">{title}</h2>
-          <p className="mt-1 text-xs font-bold text-mist">{subtitle}</p>
+          <h2 className="text-xl font-black sm:text-lg">{title}</h2>
+          <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-normal">{subtitle}</p>
         </div>
-        <span className="text-xs font-bold text-mist">{stats.totalVotes} votes</span>
+        <span className="text-sm font-bold text-mist sm:text-xs">{stats.totalVotes} votes</span>
       </div>
       {playerGuessOptions ? (
         <div className="mb-4 grid gap-2">
@@ -146,7 +146,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
           ))}
         </div>
       )}
-      <div className="mb-4 grid gap-2 text-sm font-bold">
+      <div className="mb-4 grid gap-3 text-base font-bold sm:gap-2 sm:text-sm">
         <Meter label="Player A" value={stats.playerAIsAiPercent} />
         <Meter label="Player B" value={stats.playerBIsAiPercent} />
       </div>
@@ -158,12 +158,12 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
 function Meter({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="mb-1 flex justify-between text-mist">
+      <div className="mb-2 flex justify-between text-mist sm:mb-1">
         <span>{label}</span>
         <span>{value}% AI</span>
       </div>
-      <div className="h-2 rounded-full bg-panel">
-        <div className="h-2 rounded-full bg-neon" style={{ width: `${value}%` }} />
+      <div className="h-3 rounded-full bg-panel sm:h-2">
+        <div className="h-3 rounded-full bg-neon sm:h-2" style={{ width: `${value}%` }} />
       </div>
     </div>
   );

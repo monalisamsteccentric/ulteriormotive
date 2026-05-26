@@ -87,15 +87,20 @@ input {
 }
 
 @media (max-width: 760px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    font-size: 16px;
+    font-size: 17px;
+    line-height: 1.55;
   }
 
   input,
   textarea,
   button {
-    min-height: 52px;
-    font-size: 16px !important;
+    min-height: 56px;
+    font-size: 17px !important;
     line-height: 1.45;
   }
 
@@ -106,18 +111,56 @@ input {
   }
 
   .text-xs {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
+    line-height: 1.35rem;
   }
 
   .text-sm {
-    font-size: 0.9375rem;
+    font-size: 1rem;
+    line-height: 1.55rem;
+  }
+
+  .text-base {
+    font-size: 1.0625rem;
+    line-height: 1.7rem;
+  }
+
+  .text-lg {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  .text-xl {
+    font-size: 1.375rem;
+    line-height: 1.8rem;
+  }
+
+  .text-2xl {
+    font-size: 1.75rem;
+    line-height: 2.1rem;
+  }
+
+  .text-3xl {
+    font-size: 2.125rem;
+    line-height: 2.45rem;
+  }
+
+  .tracking-\[0\.18em\] {
+    letter-spacing: 0.08em;
   }
 
   .phone-frame {
-    height: 620px;
+    min-height: 590px;
+    height: auto;
+    border-radius: 34px;
   }
 
   .phone-frame-mid {
-    height: 650px;
+    min-height: 620px;
+  }
+
+  .pink-stage::before {
+    inset: 10px;
+    border-radius: 28px;
   }
 }

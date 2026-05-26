@@ -18,8 +18,8 @@ export function MatchSharePanel({ matchId }: { matchId: string }) {
 
   return (
     <section className="rounded-lg border border-line bg-ink p-4">
-      <p className="text-xs font-black uppercase text-mist">Audience match link</p>
-      <p className="mt-2 break-all text-sm font-black text-white">{matchId}</p>
+      <p className="text-sm font-black uppercase text-mist sm:text-xs">Audience match link</p>
+      <p className="mt-2 break-all text-base font-black text-white sm:text-sm">{matchId}</p>
       <Button type="button" variant="ghost" className="mt-3 w-full" onClick={copy}>
         {copied ? "Copied" : "Copy audience link"}
       </Button>

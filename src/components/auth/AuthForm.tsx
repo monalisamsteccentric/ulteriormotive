@@ -133,11 +133,11 @@ export function AuthForm() {
 
   return (
     <div className="space-y-3">
-      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 outline-none focus:border-neon" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
-      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 outline-none focus:border-neon" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 outline-none focus:border-neon" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-      {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
-      {message ? <p className="text-sm font-bold text-neon">{message}</p> : null}
+      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 text-base outline-none focus:border-neon" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
+      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 text-base outline-none focus:border-neon" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 text-base outline-none focus:border-neon" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
+      {error ? <p className="text-base font-bold text-shock sm:text-sm">{error}</p> : null}
+      {message ? <p className="text-base font-bold text-neon sm:text-sm">{message}</p> : null}
       {message ? (
         <Button className="w-full" variant="ghost" onClick={resendConfirmation} disabled={Boolean(pending)}>
           {pending === "resend" ? "Sending..." : "Resend confirmation email"}
