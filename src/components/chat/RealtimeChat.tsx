@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChatBubble } from "./ChatBubble";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { validateMessage } from "@/lib/utils";
-import { Message, PlayerRole, SenderRole } from "@/types/database";
+import { Message, PlayerRole, PublicMatch, SenderRole } from "@/types/database";
 
 function roleLabel(role: SenderRole) {
   if (role === "player_a") return "Player A";
@@ -60,6 +60,17 @@ export function RealtimeChat({
     mergeMessages((await response.json()) as Message[]);
   }
 
+  async function syncMatch() {
+    const response = await fetch(`/api/matches/${matchId}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const match = (await response.json()) as PublicMatch;
+    if (match.status === "revealed" || match.status === "completed") {
+      router.push(`/match/${matchId}/reveal`);
+      return;
+    }
+    if (match.status !== status) router.refresh();
+  }
+
   async function markEntered(userIdToMark: string) {
     const response = await fetch(`/api/matches/${matchId}/enter`, {
       method: "POST",
@@ -95,6 +106,7 @@ export function RealtimeChat({
       .channel(`messages:${matchId}`)
       .on("broadcast", { event: "message" }, (payload) => {
         mergeMessages([payload.payload as Message]);
+        syncMessages();
       })
       .subscribe();
 
@@ -104,10 +116,29 @@ export function RealtimeChat({
   }, [matchId, clientUserId, playerAUserId, playerBUserId, router]);
 
   useEffect(() => {
+    const supabase = supabaseClient();
+    const channel = supabase
+      .channel(`matches:${matchId}`)
+      .on("broadcast", { event: "updated" }, () => {
+        syncMatch();
+        syncMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [matchId, status, router]);
+
+  useEffect(() => {
     syncMessages();
-    const id = window.setInterval(syncMessages, 4000);
+    syncMatch();
+    const id = window.setInterval(() => {
+      syncMessages();
+      syncMatch();
+    }, 4000);
     return () => window.clearInterval(id);
-  }, [matchId]);
+  }, [matchId, status, router]);
 
   useEffect(() => {
     if (status !== "waiting") return;
@@ -144,14 +175,21 @@ export function RealtimeChat({
       setError(result.error);
       return;
     }
+    const submittedMessage = result.message;
     setDraft("");
     setError("");
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ matchId, senderRole: role, senderUserId: clientUserId, message: result.message })
+      body: JSON.stringify({ matchId, senderRole: role, senderUserId: clientUserId, message: submittedMessage })
     });
-    if (!response.ok) setError("Message failed. Try again.");
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      setError(result?.error ?? "Message failed. Try again.");
+      setDraft(submittedMessage);
+    } else {
+      syncMessages();
+    }
   }
 
   return (
@@ -173,9 +211,6 @@ export function RealtimeChat({
         {messages.map((message) => (
           <ChatBubble key={message.id} message={message} />
         ))}
-        <div className="w-fit rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-mist">
-          typing...
-        </div>
         <div ref={bottomRef} />
       </div>
       {role === "audience" ? (
