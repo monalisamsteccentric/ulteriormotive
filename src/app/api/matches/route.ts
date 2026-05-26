@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createMatch } from "@/lib/matchService";
 import { MissingSupabaseEnvError } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (error && typeof error === "object" && "message" in error) {
