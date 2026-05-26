@@ -1,56 +1,19 @@
 import { VoteChoice, VoteStats } from "@/types/database";
-import { supabaseServer } from "./supabaseServer";
+import { callMatchEdgeFunctionJson } from "./edgeProxy";
 
 export async function vote(input: { matchId: string; voterUserId: string; vote: VoteChoice }) {
-  const supabase = await supabaseServer();
-  const { error } = await supabase.from("votes").upsert(
-    {
-      match_id: input.matchId,
-      voter_user_id: input.voterUserId,
-      vote: input.vote
-    },
-    { onConflict: "match_id,voter_user_id" }
-  );
-  if (error) throw error;
+  await callMatchEdgeFunctionJson("vote", input);
 }
 
 export async function voteStats(matchId: string): Promise<VoteStats> {
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase.rpc("get_vote_stats", { p_match_id: matchId });
-  if (error) throw error;
-  return normalizeVoteStats(data);
+  return callMatchEdgeFunctionJson<VoteStats>("vote-stats", { matchId });
 }
 
 export async function getUserVote(input: { matchId: string; voterUserId: string }) {
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("votes")
-    .select("vote")
-    .eq("match_id", input.matchId)
-    .eq("voter_user_id", input.voterUserId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data?.vote ?? null) as VoteChoice | null;
+  const data = await callMatchEdgeFunctionJson<VoteStats & { selectedVote?: VoteChoice | null }>("vote-stats", input);
+  return data.selectedVote ?? null;
 }
 
 export async function broadcastVoteStats(matchId: string, stats: VoteStats) {
-  const supabase = await supabaseServer();
-  const channel = supabase.channel(`votes:${matchId}`);
-  await channel.subscribe();
-  await channel.send({ type: "broadcast", event: "stats", payload: stats });
-  await supabase.removeChannel(channel);
-}
-
-function normalizeVoteStats(data: unknown): VoteStats {
-  const stats = (data ?? {}) as Partial<Record<keyof VoteStats, unknown>>;
-  return {
-    playerAIsAiPercent: toNumber(stats.playerAIsAiPercent),
-    playerBIsAiPercent: toNumber(stats.playerBIsAiPercent),
-    totalVotes: toNumber(stats.totalVotes)
-  };
-}
-
-function toNumber(value: unknown) {
-  const number = Number(value ?? 0);
-  return Number.isFinite(number) ? number : 0;
+  return { matchId, stats };
 }

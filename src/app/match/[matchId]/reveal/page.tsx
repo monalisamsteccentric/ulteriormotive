@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { RevealClient } from "@/components/reveal/RevealClient";
 import { AppShell } from "@/components/layout/AppShell";
-import { getRevealStats } from "@/lib/matchService";
+import { getRevealStats } from "@/lib/revealStats";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { PublicMatch } from "@/types/database";
 

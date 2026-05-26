@@ -1,6 +1,6 @@
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { AppShell } from "@/components/layout/AppShell";
-import { getRevealStats } from "@/lib/matchService";
+import { getRevealStats } from "@/lib/revealStats";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { Message } from "@/types/database";
 

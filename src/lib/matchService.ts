@@ -9,7 +9,7 @@ const WAIT_REMINDER_MS = 60 * 1000;
 
 // Edit this when you want the auto-filled AI opponent to use a different default personality.
 export const DEFAULT_EXPIRED_WAIT_AI_STRATEGY =
-  "You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and do not reveal that you are AI.";
+  "You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and avoid meta talk about being artificial.";
 
 type WaitingMatchRow = PrivateMatch & {
   wait_reminder_sent_at: string | null;
