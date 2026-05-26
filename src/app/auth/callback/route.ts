@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabaseServer";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -9,9 +10,15 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({
-      cookies: () => cookieStore as unknown as ReturnType<typeof cookies>
-    });
+    const supabase = createRouteHandlerClient(
+      {
+        cookies: () => cookieStore as unknown as ReturnType<typeof cookies>
+      },
+      {
+        supabaseUrl: getSupabaseUrl(),
+        supabaseKey: getSupabaseAnonKey()
+      }
+    );
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
