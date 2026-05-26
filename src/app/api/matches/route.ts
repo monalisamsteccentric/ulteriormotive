@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMatch } from "@/lib/matchService";
-import { getMissingSupabaseServiceEnvNames, getSupabaseServiceRoleKey, getSupabaseUrl } from "@/lib/supabaseServer";
+import { getSupabaseServerConfig } from "@/lib/serverConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,13 +15,13 @@ function getErrorMessage(error: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseUrl = getSupabaseUrl();
-    const supabaseServiceKey = getSupabaseServiceRoleKey();
-    if (!supabaseUrl || !supabaseServiceKey) {
+    const { missing } = getSupabaseServerConfig();
+    if (missing.length > 0) {
       return Response.json(
         {
           error: "Supabase env missing",
-          missing: getMissingSupabaseServiceEnvNames()
+          message: "SUPABASE_SERVICE_ROLE_KEY must be available to create matches on the server.",
+          missing
         },
         { status: 500 }
       );
