@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMatch } from "@/lib/matchService";
+import { getMissingSupabaseServiceEnvNames, getSupabaseServiceRoleKey, getSupabaseUrl } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +15,17 @@ function getErrorMessage(error: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Supabase env runtime types", {
-      NEXT_PUBLIC_SUPABASE_URL: typeof process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      SUPABASE_SERVICE_ROLE_KEY: typeof process.env.SUPABASE_SERVICE_ROLE_KEY
-    });
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseServiceKey = getSupabaseServiceRoleKey();
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return Response.json(
+        {
+          error: "Supabase env missing",
+          missing: getMissingSupabaseServiceEnvNames()
+        },
+        { status: 500 }
+      );
+    }
 
     const body = await request.json();
     const match = await createMatch(body);

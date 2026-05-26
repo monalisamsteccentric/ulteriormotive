@@ -10,13 +10,19 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies();
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseAnonKey = getSupabaseAnonKey();
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({ error: "Supabase env missing" }, { status: 500 });
+    }
+
     const supabase = createRouteHandlerClient(
       {
         cookies: () => cookieStore as unknown as ReturnType<typeof cookies>
       },
       {
-        supabaseUrl: getSupabaseUrl(),
-        supabaseKey: getSupabaseAnonKey()
+        supabaseUrl,
+        supabaseKey: supabaseAnonKey
       }
     );
     const { error } = await supabase.auth.exchangeCodeForSession(code);
