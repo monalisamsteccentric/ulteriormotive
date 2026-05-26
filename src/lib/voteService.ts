@@ -1,8 +1,8 @@
 import { VoteChoice, VoteStats } from "@/types/database";
-import { supabaseAdmin, supabaseServer } from "./supabaseServer";
+import { supabaseServer } from "./supabaseServer";
 
 export async function vote(input: { matchId: string; voterUserId: string; vote: VoteChoice }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { error } = await supabase.from("votes").upsert(
     {
       match_id: input.matchId,
@@ -22,7 +22,7 @@ export async function voteStats(matchId: string): Promise<VoteStats> {
 }
 
 export async function getUserVote(input: { matchId: string; voterUserId: string }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("votes")
     .select("vote")
@@ -34,7 +34,7 @@ export async function getUserVote(input: { matchId: string; voterUserId: string 
 }
 
 export async function broadcastVoteStats(matchId: string, stats: VoteStats) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const channel = supabase.channel(`votes:${matchId}`);
   await channel.subscribe();
   await channel.send({ type: "broadcast", event: "stats", payload: stats });

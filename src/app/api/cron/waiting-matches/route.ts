@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { processWaitingMatches } from "@/lib/matchService";
+import { callMatchEdgeFunction } from "@/lib/edgeProxy";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -18,10 +18,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processWaitingMatches();
-    return NextResponse.json(result, {
-      headers: { "cache-control": "no-store" }
-    });
+    return callMatchEdgeFunction("waiting-matches");
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }

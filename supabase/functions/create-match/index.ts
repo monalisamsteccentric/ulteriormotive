@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
   try {
     const input = validateInput(await req.json());
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !serviceRoleKey) {
       return Response.json(
@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
           error: "Supabase env missing",
           missing: [
             ...(!supabaseUrl ? ["SUPABASE_URL"] : []),
-            ...(!serviceRoleKey ? ["SUPABASE_SERVICE_ROLE_KEY"] : [])
+            ...(!serviceRoleKey ? ["SERVICE_ROLE_KEY"] : [])
           ]
         },
         { status: 500, headers: corsHeaders }

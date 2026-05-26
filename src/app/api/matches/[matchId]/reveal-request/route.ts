@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requestReveal } from "@/lib/matchService";
+import { callMatchEdgeFunction } from "@/lib/edgeProxy";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -13,8 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { matchId } = await params;
     const body = await request.json();
-    const result = await requestReveal({ matchId, userId: body.userId });
-    return NextResponse.json(result);
+    return callMatchEdgeFunction("reveal-request", { matchId, userId: body.userId });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }

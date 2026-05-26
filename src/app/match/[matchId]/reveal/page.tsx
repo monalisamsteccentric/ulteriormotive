@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { RevealClient } from "@/components/reveal/RevealClient";
 import { AppShell } from "@/components/layout/AppShell";
 import { getRevealStats } from "@/lib/matchService";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { PrivateMatch } from "@/types/database";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { PublicMatch } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +52,12 @@ export default async function RevealPage({ params }: { params: Promise<{ matchId
     );
   }
 
-  const supabase = supabaseAdmin();
-  const { data, error } = await supabase.from("matches").select("*").eq("id", matchId).maybeSingle();
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("public_matches").select("*").eq("id", matchId).maybeSingle();
   if (error) throw error;
   if (!data) redirect("/");
 
-  const match = data as PrivateMatch;
+  const match = data as PublicMatch;
 
   if (match.status !== "revealed" && match.status !== "completed") {
     return (

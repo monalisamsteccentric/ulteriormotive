@@ -1,6 +1,6 @@
 import { ControlType, Message, PlayerRole, PrivateMatch, PublicMatch, RevealStats, VoteChoice } from "@/types/database";
 import { createAiReplyResult, replyDelayMs } from "./aiPlayer";
-import { supabaseAdmin } from "./supabaseServer";
+import { supabaseServer } from "./supabaseServer";
 import { cleanMessage, createInviteCode, validateMessage } from "./utils";
 
 const aiTurnLocks = new Map<string, Promise<unknown>>();
@@ -35,7 +35,7 @@ export async function createMatch(input: {
   waitMinutes: 5 | 30 | 60;
   aiStrategy?: string;
 }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const inviteCode = createInviteCode();
   const waitUntil = new Date(Date.now() + input.waitMinutes * 60_000).toISOString();
   const payload = {
@@ -56,7 +56,7 @@ export async function createMatch(input: {
 }
 
 export async function joinMatch(input: { inviteCode: string; userId: string; controlType: ControlType; aiStrategy?: string }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error } = await supabase.from("matches").select("*").eq("invite_code", input.inviteCode).single();
   if (error) throw error;
   if (!match) throw new Error("Match not found.");
@@ -88,7 +88,7 @@ export async function joinMatch(input: { inviteCode: string; userId: string; con
 }
 
 export async function enterMatchRoom(input: { matchId: string; userId: string }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", input.matchId).single();
   if (error) throw error;
   if (!match) throw new Error("Match not found.");
@@ -116,7 +116,7 @@ export async function enterMatchRoom(input: { matchId: string; userId: string })
 }
 
 export async function injectAiIfExpired(matchId: string) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error) throw error;
   if (!match || match.status !== "waiting" || new Date(match.wait_until).getTime() > Date.now()) return;
@@ -125,7 +125,7 @@ export async function injectAiIfExpired(matchId: string) {
 }
 
 export async function injectAiIntoOpenSeat(matchId: string) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error) throw error;
   if (!match || match.status !== "waiting") return false;
@@ -133,7 +133,7 @@ export async function injectAiIntoOpenSeat(matchId: string) {
 }
 
 export async function processWaitingMatches() {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   const reminderCutoffIso = new Date(now + WAIT_REMINDER_MS).toISOString();
@@ -212,7 +212,7 @@ async function fillEmptySeatWithAi(match: WaitingMatchRow, options: { ignoreWait
           started_at: match.started_at ?? nowIso
         };
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("matches")
     .update(update)
@@ -297,7 +297,7 @@ export async function sendMessage(input: {
   const result = validateMessage(input.message);
   if (!result.ok) throw new Error(result.error);
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("messages")
     .insert({
@@ -325,7 +325,7 @@ export async function sendAiReplyIfNeeded(matchId: string, lastMessage: Message)
 async function sendAiReplyIfNeededUnlocked(matchId: string, lastMessage: Message) {
   if (lastMessage.sender_role !== "player_a" && lastMessage.sender_role !== "player_b") return null;
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error) throw error;
   return sendAiTurnIfNeeded(match as PrivateMatch);
@@ -336,7 +336,7 @@ async function startMatchIfReady(match: PrivateMatch) {
   if (!match.player_a_user_id || !match.player_b_user_id) return match;
   if (!match.player_a_entered_at || !match.player_b_entered_at) return match;
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("matches")
     .update({ status: "live", started_at: match.started_at ?? new Date().toISOString() })
@@ -350,7 +350,7 @@ async function startMatchIfReady(match: PrivateMatch) {
 }
 
 async function broadcastMatchUpdate(matchId: string) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const channel = supabase.channel(`matches:${matchId}`);
   await channel.subscribe();
   await channel.send({ type: "broadcast", event: "updated", payload: { matchId } });
@@ -359,7 +359,7 @@ async function broadcastMatchUpdate(matchId: string) {
 
 export async function sendNextAiMessage(matchId: string) {
   return withAiTurnLock(matchId, async () => {
-    const supabase = supabaseAdmin();
+    const supabase = await supabaseServer();
     const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
     if (error) throw error;
     return sendAiTurnIfNeeded(match as PrivateMatch);
@@ -371,7 +371,7 @@ async function startAiVsAiIfNeeded(match: PrivateMatch, continueExisting = false
   if (match.player_a_control_type !== "ai" || match.player_b_control_type !== "ai") return null;
 
   if (!continueExisting) {
-    const supabase = supabaseAdmin();
+    const supabase = await supabaseServer();
     const { count, error } = await supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
@@ -390,7 +390,7 @@ async function sendAiTurnIfNeeded(match: PrivateMatch) {
   const playerBIsAi = match.player_b_control_type === "ai";
   if (!playerAIsAi && !playerBIsAi) return null;
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: messages, error } = await supabase
     .from("messages")
     .select("id, match_id, sender_role, sender_user_id, message, is_ai_generated, created_at")
@@ -454,7 +454,7 @@ function cleanAiStrategy(input?: string) {
 }
 
 export async function getRevealStats(matchId: string): Promise<RevealStats> {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: match, error: matchError } = await supabase
     .from("matches")
     .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, status")
@@ -591,7 +591,7 @@ function percent(value: number, total: number) {
 }
 
 export async function requestReveal(input: { matchId: string; userId: string }) {
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data, error } = await supabase.from("matches").select("*").eq("id", input.matchId).single();
   if (error) throw error;
   if (!data) throw new Error("Match not found.");

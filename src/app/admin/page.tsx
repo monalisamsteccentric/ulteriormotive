@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
-import { supabaseAdmin, supabaseServer } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export default async function AdminPage() {
     );
   }
 
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", userData.user.id).single();
   if (!profile?.is_admin) {
     return (

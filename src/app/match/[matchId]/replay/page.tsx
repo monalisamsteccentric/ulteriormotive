@@ -1,14 +1,14 @@
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { AppShell } from "@/components/layout/AppShell";
 import { getRevealStats } from "@/lib/matchService";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { Message } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReplayPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = await params;
-  const supabase = supabaseAdmin();
+  const supabase = await supabaseServer();
   const { data } = await supabase.from("public_messages").select("*").eq("match_id", matchId).order("created_at");
   const stats =
     matchId === "demo"
