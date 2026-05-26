@@ -20,11 +20,13 @@ export class MissingSupabaseEnvError extends Error {
   }
 }
 
-export function getMissingSupabaseEnvNames() {
-  return SUPABASE_ENV_NAMES.filter((name) => !process.env[name]);
+export function getMissingSupabaseEnvNames(env: NodeJS.ProcessEnv = process.env) {
+  return SUPABASE_ENV_NAMES.filter((name) => !env[name]);
 }
 
-export const hasSupabaseEnv = getMissingSupabaseEnvNames().length === 0;
+export function hasSupabaseEnv() {
+  return getMissingSupabaseEnvNames(process.env).length === 0;
+}
 
 export const supabaseServer = async () => {
   const cookieStore = await cookies();
@@ -34,15 +36,16 @@ export const supabaseServer = async () => {
 };
 
 export const supabaseAdmin = () => {
-  const missing = getMissingSupabaseEnvNames();
+  const env = process.env;
+  const missing = getMissingSupabaseEnvNames(env);
 
   if (missing.length > 0) {
     console.error("Missing Supabase environment variables:", missing);
     throw new MissingSupabaseEnvError(missing);
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+  const url = env.NEXT_PUBLIC_SUPABASE_URL as string;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY as string;
 
   return createClient(url, key, {
     auth: {

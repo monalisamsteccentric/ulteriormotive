@@ -5,7 +5,7 @@ import { hasSupabaseEnv, supabaseAdmin, supabaseServer } from "@/lib/supabaseSer
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv()) {
     return (
       <AppShell>
         <h1 className="text-3xl font-black">Admin setup required</h1>
