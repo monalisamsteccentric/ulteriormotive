@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMatch } from "@/lib/matchService";
-import { getMissingSupabaseEnvNames, MissingSupabaseEnvError } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,32 +14,16 @@ function getErrorMessage(error: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    const missing = getMissingSupabaseEnvNames(process.env);
-    if (missing.length > 0) {
-      console.error("Missing Supabase environment variables:", missing);
-      return NextResponse.json(
-        {
-          error: "Missing Supabase server environment variables.",
-          missing
-        },
-        { status: 500 }
-      );
-    }
+    console.log("Supabase env runtime types", {
+      NEXT_PUBLIC_SUPABASE_URL: typeof process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: typeof process.env.SUPABASE_SERVICE_ROLE_KEY
+    });
 
     const body = await request.json();
     const match = await createMatch(body);
     return NextResponse.json(match);
   } catch (error) {
-    if (error instanceof MissingSupabaseEnvError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          missing: error.missing
-        },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
 }

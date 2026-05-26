@@ -6,7 +6,6 @@ import { cleanMessage, createInviteCode, validateMessage } from "./utils";
 const aiTurnLocks = new Map<string, Promise<unknown>>();
 const MIN_REVEAL_MS = 2 * 60 * 1000;
 const WAIT_REMINDER_MS = 60 * 1000;
-const WAITING_MATCH_ALERT_EMAIL = process.env.WAITING_MATCH_ALERT_EMAIL || "monalisa.sahoo.jsr@gmail.com";
 
 // Edit this when you want the auto-filled AI opponent to use a different default personality.
 export const DEFAULT_EXPIRED_WAIT_AI_STRATEGY =
@@ -251,7 +250,7 @@ async function sendWaitReminderEmail(match: WaitingMatchRow) {
     },
     body: JSON.stringify({
       from: process.env.WAITING_MATCH_EMAIL_FROM || "Ulterior Motive <onboarding@resend.dev>",
-      to: WAITING_MATCH_ALERT_EMAIL,
+      to: getWaitingMatchAlertEmail(),
       subject: `Ulterior Motive match needs ${emptySeat}`,
       text: [
         `A match has about one minute left before AI is assigned.`,
@@ -275,6 +274,10 @@ async function sendWaitReminderEmail(match: WaitingMatchRow) {
   }
 
   return true;
+}
+
+function getWaitingMatchAlertEmail() {
+  return process.env.WAITING_MATCH_ALERT_EMAIL || "monalisa.sahoo.jsr@gmail.com";
 }
 
 function getAppUrl() {

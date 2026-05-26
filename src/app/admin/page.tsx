@@ -1,19 +1,10 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
-import { hasSupabaseEnv, supabaseAdmin, supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin, supabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  if (!hasSupabaseEnv()) {
-    return (
-      <AppShell>
-        <h1 className="text-3xl font-black">Admin setup required</h1>
-        <p className="mt-2 text-sm font-bold text-mist">Add Supabase environment variables to enable admin tools.</p>
-      </AppShell>
-    );
-  }
-
   const auth = await supabaseServer();
   const { data: userData } = await auth.auth.getUser();
   if (!userData.user) {
