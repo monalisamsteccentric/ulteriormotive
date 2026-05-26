@@ -31,7 +31,6 @@ cp .env.example .env.local
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -41,7 +40,7 @@ WAITING_MATCH_ALERT_EMAIL=monalisa.sahoo.jsr@gmail.com
 WAITING_MATCH_EMAIL_FROM=Ulterior Motive <onboarding@resend.dev>
 ```
 
-Never expose `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
+Set `SERVICE_ROLE_KEY` as a Supabase Edge Function secret, not in Amplify. Never expose `SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
 
 4. Run `supabase/schema.sql` in your Supabase SQL editor.
 
