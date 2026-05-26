@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { broadcastVoteStats, vote, voteStats } from "@/lib/voteService";
+import { broadcastVoteStats, getUserVote, vote, voteStats } from "@/lib/voteService";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -12,8 +12,16 @@ function getErrorMessage(error: unknown) {
 export async function GET(request: NextRequest) {
   try {
     const matchId = request.nextUrl.searchParams.get("matchId");
+    const voterUserId = request.nextUrl.searchParams.get("voterUserId");
     if (!matchId) throw new Error("Missing matchId.");
-    return NextResponse.json(await voteStats(matchId), {
+    const stats = await voteStats(matchId);
+    if (voterUserId) {
+      const selectedVote = await getUserVote({ matchId, voterUserId });
+      return NextResponse.json({ ...stats, selectedVote }, {
+        headers: { "cache-control": "no-store" }
+      });
+    }
+    return NextResponse.json(stats, {
       headers: { "cache-control": "no-store" }
     });
   } catch (error) {

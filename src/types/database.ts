@@ -62,4 +62,18 @@ export type RevealStats = VoteStats & {
   playerAWrongGuesses: number;
   playerBWrongGuesses: number;
   deceptionWinner: PlayerRole | "tie";
+  playerAScore: PlayerScore;
+  playerBScore: PlayerScore;
+  scoreWinner: PlayerRole | "tie";
+};
+
+export type PlayerScore = {
+  role: PlayerRole;
+  targetRole: PlayerRole;
+  targetActualType: ControlType;
+  guessedType: ControlType | null;
+  correct: boolean | null;
+  baseScore: number;
+  percentChange: number;
+  finalScore: number;
 };

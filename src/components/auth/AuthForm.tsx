@@ -11,7 +11,11 @@ export function AuthForm() {
   const [username, setUsername] = useState("Guest");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [pending, setPending] = useState<"login" | "signup" | "google" | null>(null);
+  const [pending, setPending] = useState<"login" | "signup" | "google" | "resend" | null>(null);
+
+  function confirmationRedirectUrl() {
+    return `${window.location.origin}/auth/callback?next=/auth/sync`;
+  }
 
   async function auth(mode: "login" | "signup") {
     setError("");
@@ -36,7 +40,7 @@ export function AuthForm() {
         password,
         options: {
           data: { name: trimmedUsername },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/sync`
+          emailRedirectTo: confirmationRedirectUrl()
         }
       });
 
@@ -47,7 +51,7 @@ export function AuthForm() {
     }
 
     if (mode === "signup" && !result.data.session) {
-      setMessage("Check your email to confirm your account, then log in.");
+      setMessage("Confirmation email sent. Check inbox/spam, or resend it below.");
       setPending(null);
       return;
     }
@@ -69,6 +73,37 @@ export function AuthForm() {
     }
 
     window.location.replace("/");
+  }
+
+  async function resendConfirmation() {
+    setError("");
+    setMessage("");
+    setPending("resend");
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setError("Enter your email first.");
+      setPending(null);
+      return;
+    }
+
+    const supabase = supabaseClient();
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email: cleanEmail,
+      options: {
+        emailRedirectTo: confirmationRedirectUrl()
+      }
+    });
+
+    if (resendError) {
+      setError(resendError.message);
+      setPending(null);
+      return;
+    }
+
+    setMessage("Confirmation email sent again. Check inbox and spam.");
+    setPending(null);
   }
 
   async function googleAuth() {
@@ -103,6 +138,11 @@ export function AuthForm() {
       <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 outline-none focus:border-neon" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
       {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
       {message ? <p className="text-sm font-bold text-neon">{message}</p> : null}
+      {message ? (
+        <Button className="w-full" variant="ghost" onClick={resendConfirmation} disabled={Boolean(pending)}>
+          {pending === "resend" ? "Sending..." : "Resend confirmation email"}
+        </Button>
+      ) : null}
       <Button className="w-full gap-2" variant="ghost" onClick={googleAuth} disabled={Boolean(pending)}>
         <Chrome size={18} />
         {pending === "google" ? "Connecting..." : "Continue with Google"}

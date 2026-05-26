@@ -21,6 +21,18 @@ export async function voteStats(matchId: string): Promise<VoteStats> {
   return normalizeVoteStats(data);
 }
 
+export async function getUserVote(input: { matchId: string; voterUserId: string }) {
+  const supabase = supabaseAdmin();
+  const { data, error } = await supabase
+    .from("votes")
+    .select("vote")
+    .eq("match_id", input.matchId)
+    .eq("voter_user_id", input.voterUserId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.vote ?? null) as VoteChoice | null;
+}
+
 export async function broadcastVoteStats(matchId: string, stats: VoteStats) {
   const supabase = supabaseAdmin();
   const channel = supabase.channel(`votes:${matchId}`);

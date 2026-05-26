@@ -21,9 +21,10 @@ export function HeaderAccount() {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
       const localName = localStorage.getItem("hidden_username")?.trim();
+      const savedLocalName = localName && localName !== "Guest" ? localName : null;
 
       if (!user) {
-        setAccount(localName ? { signedIn: false, displayName: localName } : null);
+        setAccount(savedLocalName ? { signedIn: false, displayName: savedLocalName } : null);
         return;
       }
 
@@ -34,13 +35,14 @@ export function HeaderAccount() {
         .maybeSingle();
 
       const displayName =
-        localName ||
         profile?.username ||
+        savedLocalName ||
         user.user_metadata?.name ||
         user.user_metadata?.full_name ||
         user.email?.split("@")[0] ||
         "Profile";
 
+      localStorage.setItem("hidden_username", displayName);
       setAccount({ signedIn: true, displayName });
     }
 

@@ -8,11 +8,15 @@ import { RevealStats } from "@/types/database";
 export function RevealClient({ stats, replayHref }: { stats: RevealStats; replayHref: string }) {
   const [count, setCount] = useState(3);
   const winnerLabel =
-    stats.deceptionWinner === "player_a"
+    stats.scoreWinner === "player_a"
       ? "Player A won"
-      : stats.deceptionWinner === "player_b"
+      : stats.scoreWinner === "player_b"
         ? "Player B won"
         : "It is a tie";
+  const scoreReason =
+    stats.scoreWinner === "tie"
+      ? `Both players finished on ${stats.playerAScore.finalScore} points.`
+      : `${stats.scoreWinner === "player_a" ? "Player A" : "Player B"} finished higher: Player A ${stats.playerAScore.finalScore}, Player B ${stats.playerBScore.finalScore}.`;
 
   useEffect(() => {
     if (count === 0) return;
@@ -36,16 +40,27 @@ export function RevealClient({ stats, replayHref }: { stats: RevealStats; replay
       <RevealCard label="Player A" value={stats.playerAType.toUpperCase()} />
       <RevealCard label="Player B" value={stats.playerBType.toUpperCase()} />
       <section className="rounded-lg border border-line bg-ink p-5">
-        <p className="text-sm font-black uppercase text-mist">Deception winner</p>
+        <p className="text-sm font-black uppercase text-mist">Score winner</p>
         <p className="text-4xl font-black text-shock">{winnerLabel}</p>
         <p className="mt-2 text-sm font-bold leading-6 text-mist">
-          Player A fooled {stats.playerAWrongGuesses} voters. Player B fooled {stats.playerBWrongGuesses} voters.
+          Each player started at 100 points. A correct opposite-player guess adds 30%. A wrong guess removes 30%.
         </p>
+        <p className="mt-2 text-sm font-bold leading-6 text-white">{scoreReason}</p>
       </section>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ScoreCard label="Player A" score={stats.playerAScore} />
+        <ScoreCard label="Player B" score={stats.playerBScore} />
+      </div>
       <section className="rounded-lg border border-line bg-ink p-5">
         <p className="text-sm font-black uppercase text-mist">Audience accuracy</p>
         <p className="text-4xl font-black text-neon">{stats.audienceAccuracyPercent}%</p>
         <p className="text-sm font-bold text-mist">{stats.correctVotes} correct out of {stats.totalVotes} votes</p>
+      </section>
+      <section className="rounded-lg border border-line bg-ink p-5">
+        <p className="text-sm font-black uppercase text-mist">Deception result</p>
+        <p className="mt-2 text-sm font-bold leading-6 text-mist">
+          Player A fooled {stats.playerAWrongGuesses} voters. Player B fooled {stats.playerBWrongGuesses} voters.
+        </p>
       </section>
       <div className="grid gap-2 sm:grid-cols-2">
         <Button onClick={share}>
@@ -64,6 +79,28 @@ function RevealCard({ label, value }: { label: string; value: string }) {
     <section className="rounded-lg border border-line bg-ink p-5">
       <p className="text-sm font-black uppercase text-mist">{label} was</p>
       <p className="text-4xl font-black text-neon">{value}</p>
+    </section>
+  );
+}
+
+function ScoreCard({ label, score }: { label: string; score: RevealStats["playerAScore"] }) {
+  const targetLabel = score.targetRole === "player_a" ? "Player A" : "Player B";
+  const guessed = score.guessedType ? score.guessedType.toUpperCase() : "NO GUESS";
+  const actual = score.targetActualType.toUpperCase();
+  const result =
+    score.correct === null
+      ? "No score change"
+      : score.correct
+        ? "+30% for a correct guess"
+        : "-30% for a wrong guess";
+
+  return (
+    <section className="rounded-lg border border-line bg-ink p-5">
+      <p className="text-sm font-black uppercase text-mist">{label} score</p>
+      <p className="mt-1 text-4xl font-black text-neon">{score.finalScore}</p>
+      <p className="mt-2 text-sm font-bold leading-6 text-mist">
+        Guessed {targetLabel} was {guessed}. Actual: {actual}. {result}.
+      </p>
     </section>
   );
 }

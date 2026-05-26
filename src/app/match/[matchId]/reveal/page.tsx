@@ -21,7 +21,28 @@ export default async function RevealPage({ params }: { params: Promise<{ matchId
       totalVotes: 94,
       playerAWrongGuesses: 34,
       playerBWrongGuesses: 28,
-      deceptionWinner: "player_a" as const
+      deceptionWinner: "player_a" as const,
+      playerAScore: {
+        role: "player_a" as const,
+        targetRole: "player_b" as const,
+        targetActualType: "ai" as const,
+        guessedType: "ai" as const,
+        correct: true,
+        baseScore: 100,
+        percentChange: 30,
+        finalScore: 130
+      },
+      playerBScore: {
+        role: "player_b" as const,
+        targetRole: "player_a" as const,
+        targetActualType: "human" as const,
+        guessedType: "ai" as const,
+        correct: false,
+        baseScore: 100,
+        percentChange: -30,
+        finalScore: 70
+      },
+      scoreWinner: "player_a" as const
     };
 
     return (

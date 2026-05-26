@@ -88,7 +88,13 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
           playerBIsAi={safeMatch.player_b_revealed_type === "ai"}
         />
         <div className="space-y-3">
-          <VotePanel matchId={safeMatch.id} userId={null} initialStats={stats} />
+          <VotePanel
+            matchId={safeMatch.id}
+            userId={null}
+            playerAUserId={safeMatch.player_a_user_id}
+            playerBUserId={safeMatch.player_b_user_id}
+            initialStats={stats}
+          />
           <MatchSharePanel matchId={safeMatch.id} />
           <RevealRequestPanel
             matchId={safeMatch.id}

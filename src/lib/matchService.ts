@@ -454,7 +454,7 @@ export async function getRevealStats(matchId: string): Promise<RevealStats> {
   const supabase = supabaseAdmin();
   const { data: match, error: matchError } = await supabase
     .from("matches")
-    .select("player_a_control_type, player_b_control_type, status")
+    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, status")
     .eq("id", matchId)
     .single();
   if (matchError) throw matchError;
@@ -468,25 +468,31 @@ export async function getRevealStats(matchId: string): Promise<RevealStats> {
 
   const { data: votes, error: votesError } = await supabase
     .from("votes")
-    .select("vote")
+    .select("voter_user_id, vote")
     .eq("match_id", matchId);
   if (votesError) throw votesError;
 
   return buildRevealStats({
     playerAType,
     playerBType,
-    votes: ((votes ?? []) as { vote: VoteChoice }[]).map((row) => row.vote)
+    playerAUserId: match.player_a_user_id,
+    playerBUserId: match.player_b_user_id,
+    votes: (votes ?? []) as { voter_user_id: string; vote: VoteChoice }[]
   });
 }
 
 function buildRevealStats({
   playerAType,
   playerBType,
+  playerAUserId,
+  playerBUserId,
   votes
 }: {
   playerAType: ControlType;
   playerBType: ControlType;
-  votes: VoteChoice[];
+  playerAUserId: string | null;
+  playerBUserId: string | null;
+  votes: { voter_user_id: string; vote: VoteChoice }[];
 }): RevealStats {
   const totalVotes = votes.length;
   let correctVotes = 0;
@@ -495,7 +501,7 @@ function buildRevealStats({
   let playerAWrongGuesses = 0;
   let playerBWrongGuesses = 0;
 
-  for (const vote of votes) {
+  for (const { vote } of votes) {
     const guessedAType: ControlType = vote === "player_a_ai" || vote === "both_ai" ? "ai" : "human";
     const guessedBType: ControlType = vote === "player_b_ai" || vote === "both_ai" ? "ai" : "human";
 
@@ -512,6 +518,26 @@ function buildRevealStats({
       : playerBWrongGuesses > playerAWrongGuesses
         ? "player_b"
         : "tie";
+  const playerAVote = votes.find((row) => row.voter_user_id === playerAUserId)?.vote ?? null;
+  const playerBVote = votes.find((row) => row.voter_user_id === playerBUserId)?.vote ?? null;
+  const playerAScore = buildPlayerScore({
+    role: "player_a",
+    targetRole: "player_b",
+    targetActualType: playerBType,
+    guessedType: playerAVote ? guessForRole(playerAVote, "player_b") : null
+  });
+  const playerBScore = buildPlayerScore({
+    role: "player_b",
+    targetRole: "player_a",
+    targetActualType: playerAType,
+    guessedType: playerBVote ? guessForRole(playerBVote, "player_a") : null
+  });
+  const scoreWinner =
+    playerAScore.finalScore > playerBScore.finalScore
+      ? "player_a"
+      : playerBScore.finalScore > playerAScore.finalScore
+        ? "player_b"
+        : "tie";
 
   return {
     playerAType,
@@ -523,7 +549,36 @@ function buildRevealStats({
     playerBIsAiPercent: percent(playerBIsAiVotes, totalVotes),
     playerAWrongGuesses,
     playerBWrongGuesses,
-    deceptionWinner
+    deceptionWinner,
+    playerAScore,
+    playerBScore,
+    scoreWinner
+  };
+}
+
+function guessForRole(vote: VoteChoice, role: PlayerRole): ControlType {
+  if (role === "player_a") {
+    return vote === "player_a_ai" || vote === "both_ai" ? "ai" : "human";
+  }
+  return vote === "player_b_ai" || vote === "both_ai" ? "ai" : "human";
+}
+
+function buildPlayerScore(input: {
+  role: PlayerRole;
+  targetRole: PlayerRole;
+  targetActualType: ControlType;
+  guessedType: ControlType | null;
+}) {
+  const baseScore = 100;
+  const correct = input.guessedType ? input.guessedType === input.targetActualType : null;
+  const percentChange = correct === null ? 0 : correct ? 30 : -30;
+
+  return {
+    ...input,
+    correct,
+    baseScore,
+    percentChange,
+    finalScore: Math.round(baseScore * (1 + percentChange / 100))
   };
 }
 
