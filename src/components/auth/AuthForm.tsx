@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Chrome } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
@@ -12,6 +12,12 @@ export function AuthForm() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<"login" | "signup" | "google" | "resend" | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("authError");
+    if (authError) setError(authError);
+  }, []);
 
   function confirmationRedirectUrl() {
     return `${window.location.origin}/auth/callback?next=/auth/sync`;
@@ -112,10 +118,18 @@ export function AuthForm() {
     setMessage("");
     setPending("google");
     localStorage.setItem("hidden_username", username.trim() || "Guest");
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      window.location.replace("/");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/sync`
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/sync`,
+        queryParams: {
+          prompt: "select_account"
+        }
       }
     });
     if (error) {

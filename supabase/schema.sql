@@ -53,6 +53,17 @@ create table votes (
   unique(match_id, voter_user_id)
 );
 
+create table moderation_warnings (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null references matches(id) on delete cascade,
+  user_id text not null,
+  warning_count integer not null default 0 check (warning_count between 0 and 3),
+  banned_at timestamptz,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique(match_id, user_id)
+);
+
 create or replace view public_matches as
 select
   id,
@@ -175,6 +186,7 @@ alter table profiles enable row level security;
 alter table matches enable row level security;
 alter table messages enable row level security;
 alter table votes enable row level security;
+alter table moderation_warnings enable row level security;
 
 create policy "profiles readable" on profiles for select using (true);
 create policy "profiles upsert own" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -185,6 +197,7 @@ create policy "service role manages messages" on messages for all using (auth.ro
 create policy "votes insertable by clients" on votes for insert with check (true);
 create policy "votes updatable by owner token" on votes for update using (true) with check (true);
 create policy "votes readable aggregate only" on votes for select using (auth.role() = 'service_role');
+create policy "service role manages moderation warnings" on moderation_warnings for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 
 grant select on public_matches to anon, authenticated;
 grant select on public_messages to anon, authenticated;

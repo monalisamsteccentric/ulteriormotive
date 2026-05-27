@@ -7,6 +7,8 @@ type VoteChoice = "player_a_ai" | "player_b_ai" | "both_ai" | "none_ai";
 
 const MIN_REVEAL_MS = 2 * 60 * 1000;
 const WAIT_REMINDER_MS = 60 * 1000;
+const AI_REPLY_DELAY_MS = 12_000;
+const MAX_MODERATION_WARNINGS = 3;
 const DEFAULT_AI_STRATEGY =
   "You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and avoid meta talk about being artificial.";
 
@@ -133,17 +135,11 @@ async function startMatchIfReady(supabase: any, match: any) {
   if (error) throw error;
   logTransition("match-live", match.id, { playerAEntered: Boolean(match.player_a_entered_at), playerBEntered: Boolean(match.player_b_entered_at) });
   await broadcastMatchUpdate(supabase, match.id);
-  await sendNextAiMessage(supabase, match.id);
   return data;
 }
 
 async function sendMessageAndMaybeAi(supabase: any, input: any) {
   const message = await insertMessage(supabase, input);
-  try {
-    await sendAiReplyIfNeeded(supabase, String(input.matchId || ""), message);
-  } catch (error) {
-    console.error("AI reply failed", error);
-  }
   return message;
 }
 
@@ -151,6 +147,9 @@ async function insertMessage(supabase: any, input: any) {
   const text = cleanMessage(String(input.message || ""));
   if (!text) throw new Error("Message cannot be empty.");
   if (text.length > 280) throw new Error("Keep messages under 280 characters.");
+  if (!input.isAiGenerated && input.senderRole !== "system") {
+    await enforceHumanMessageSafety(supabase, input, text);
+  }
   const { data, error } = await supabase
     .from("messages")
     .insert({
@@ -166,11 +165,6 @@ async function insertMessage(supabase: any, input: any) {
   logTransition("send-message", input.matchId, { senderRole: input.senderRole, isAiGenerated: Boolean(input.isAiGenerated) });
   await broadcastMessage(supabase, input.matchId, data);
   return data;
-}
-
-async function sendAiReplyIfNeeded(supabase: any, matchId: string, lastMessage: any) {
-  if (lastMessage.sender_role !== "player_a" && lastMessage.sender_role !== "player_b") return null;
-  return sendNextAiMessage(supabase, matchId);
 }
 
 async function sendNextAiMessage(supabase: any, matchId: string) {
@@ -191,7 +185,7 @@ async function sendNextAiMessage(supabase: any, matchId: string) {
   if (messageError) throw messageError;
 
   const lastMessage = messages?.at(-1);
-  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < 6_000) return null;
+  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < AI_REPLY_DELAY_MS) return null;
   if (lastMessage?.is_ai_generated && !(playerAIsAi && playerBIsAi)) return null;
 
   const role = nextAiRole(lastMessage, playerAIsAi, playerBIsAi);
@@ -224,6 +218,99 @@ async function createAiReply(role: PlayerRole, messages: any[], strategy?: strin
     ]
   });
   return completion.choices[0]?.message.content?.trim() || "wait what";
+}
+
+async function enforceHumanMessageSafety(supabase: any, input: any, text: string) {
+  const matchId = String(input.matchId || "");
+  const userId = String(input.senderUserId || "");
+  if (!matchId || !userId) return;
+
+  const { data: match, error } = await supabase
+    .from("matches")
+    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type")
+    .eq("id", matchId)
+    .single();
+  if (error) throw error;
+
+  const senderIsPlayerA = userId === match.player_a_user_id;
+  const senderIsPlayerB = userId === match.player_b_user_id;
+  const senderControlType = senderIsPlayerA ? match.player_a_control_type : senderIsPlayerB ? match.player_b_control_type : null;
+  if (senderControlType !== "human") return;
+
+  const flagged = await isInappropriateMessage(text);
+  if (!flagged) return;
+
+  const currentWarning = await getModerationWarning(supabase, matchId, userId);
+  if (currentWarning?.banned_at || Number(currentWarning?.warning_count ?? 0) >= MAX_MODERATION_WARNINGS) {
+    throw new Error("You are banned from sending messages in this match because you reached three inappropriate-message warnings.");
+  }
+
+  const warningCount = Math.min(MAX_MODERATION_WARNINGS, Number(currentWarning?.warning_count ?? 0) + 1);
+  const bannedAt = warningCount >= MAX_MODERATION_WARNINGS ? new Date().toISOString() : null;
+  await upsertModerationWarning(supabase, matchId, userId, warningCount, bannedAt);
+  logTransition("message-flagged", matchId, { userId, warningCount, banned: Boolean(bannedAt) });
+
+  if (bannedAt) {
+    throw new Error("Your message was flagged as inappropriate. This was warning 3 of 3, so you are now banned from sending messages in this match.");
+  }
+  throw new Error(`Your message was flagged as inappropriate. Warning ${warningCount} of 3. After three warnings you will be banned from sending messages in this match.`);
+}
+
+async function getModerationWarning(supabase: any, matchId: string, userId: string) {
+  const { data, error } = await supabase
+    .from("moderation_warnings")
+    .select("warning_count, banned_at")
+    .eq("match_id", matchId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (isMissingTableError(error)) return null;
+  if (error) throw error;
+  return data;
+}
+
+async function upsertModerationWarning(supabase: any, matchId: string, userId: string, warningCount: number, bannedAt: string | null) {
+  const { error } = await supabase.from("moderation_warnings").upsert(
+    {
+      match_id: matchId,
+      user_id: userId,
+      warning_count: warningCount,
+      banned_at: bannedAt,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "match_id,user_id" }
+  );
+  if (isMissingTableError(error)) return;
+  if (error) throw error;
+}
+
+async function isInappropriateMessage(text: string) {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) return heuristicInappropriateCheck(text);
+
+  try {
+    const openai = new OpenAI({ apiKey });
+    const moderation = await openai.moderations.create({
+      model: "omni-moderation-latest",
+      input: text
+    });
+    return Boolean(moderation.results?.[0]?.flagged);
+  } catch (error) {
+    console.error("Moderation failed, using local fallback", error);
+    return heuristicInappropriateCheck(text);
+  }
+}
+
+function heuristicInappropriateCheck(text: string) {
+  const normalized = text.toLowerCase();
+  return [
+    /\b(kill yourself|kys|rape|molest)\b/i,
+    /\b(nazi|terrorist)\b/i,
+    /\b(faggot|retard|cunt)\b/i
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function isMissingTableError(error: any) {
+  return error?.code === "42P01" || String(error?.message ?? "").includes("moderation_warnings");
 }
 
 function nextAiRole(lastMessage: any, playerAIsAi: boolean, playerBIsAi: boolean): PlayerRole | null {
