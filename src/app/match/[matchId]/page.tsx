@@ -55,6 +55,13 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
       created_at: new Date().toISOString()
     }
   ]) ?? []) as Message[];
+  const profileIds = [safeMatch.player_a_user_id, safeMatch.player_b_user_id].filter(isUuid) as string[];
+  const { data: profiles } = profileIds.length
+    ? await supabase.from("profiles").select("id, username").in("id", profileIds)
+    : { data: [] };
+  const profileNameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.username]));
+  const playerAName = safeMatch.player_a_user_id ? profileNameById.get(safeMatch.player_a_user_id) ?? "Player A" : "Player A";
+  const playerBName = safeMatch.player_b_user_id ? profileNameById.get(safeMatch.player_b_user_id) ?? "Player B" : "Player B";
 
   return (
     <AppShell>
@@ -95,7 +102,13 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
             playerBUserId={safeMatch.player_b_user_id}
             initialStats={stats}
           />
-          <MatchSharePanel matchId={safeMatch.id} />
+          <MatchSharePanel
+            matchId={safeMatch.id}
+            playerAUserId={safeMatch.player_a_user_id}
+            playerBUserId={safeMatch.player_b_user_id}
+            playerAName={playerAName}
+            playerBName={playerBName}
+          />
           <RevealRequestPanel
             matchId={safeMatch.id}
             status={effectiveStatus}
@@ -110,6 +123,10 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
       </div>
     </AppShell>
   );
+}
+
+function isUuid(value: string | null): value is string {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 }
 
 function MatchSeat({ label, filled, entered }: { label: string; filled: boolean; entered: boolean }) {
