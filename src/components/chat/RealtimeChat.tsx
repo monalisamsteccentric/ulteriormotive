@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChatBubble } from "./ChatBubble";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { validateMessage } from "@/lib/utils";
@@ -35,12 +35,15 @@ export function RealtimeChat({
   playerBIsAi: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const forceAudience = searchParams.get("audience") === "1";
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [entryError, setEntryError] = useState("");
   const [clientUserId, setClientUserId] = useState(userId);
   const [role, setRole] = useState<SenderRole>("audience");
+  const [liveStatus, setLiveStatus] = useState(status);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -68,6 +71,7 @@ export function RealtimeChat({
       router.push(`/match/${matchId}/reveal`);
       return;
     }
+    setLiveStatus(match.status);
     if (match.status !== status) router.refresh();
   }
 
@@ -84,8 +88,13 @@ export function RealtimeChat({
     }
     setEntryError("");
     const match = await response.json();
+    if (match?.status) setLiveStatus(match.status);
     if (match?.status && match.status !== status) router.refresh();
   }
+
+  useEffect(() => {
+    setLiveStatus(status);
+  }, [status]);
 
   useEffect(() => {
     let id = clientUserId;
@@ -95,7 +104,7 @@ export function RealtimeChat({
       setClientUserId(id);
     }
     const nextRole: PlayerRole | "audience" =
-      id === playerAUserId ? "player_a" : id === playerBUserId ? "player_b" : "audience";
+      forceAudience ? "audience" : id === playerAUserId ? "player_a" : id === playerBUserId ? "player_b" : "audience";
     setRole(nextRole);
     if (nextRole === "player_a" || nextRole === "player_b") {
       markEntered(id);
@@ -113,7 +122,7 @@ export function RealtimeChat({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [matchId, clientUserId, playerAUserId, playerBUserId, router]);
+  }, [matchId, clientUserId, playerAUserId, playerBUserId, router, forceAudience]);
 
   useEffect(() => {
     const supabase = supabaseClient();
@@ -141,22 +150,22 @@ export function RealtimeChat({
   }, [matchId, status, router]);
 
   useEffect(() => {
-    if (status !== "waiting") return;
+    if (liveStatus !== "waiting") return;
     const intervalId = window.setInterval(() => {
       if (clientUserId && (role === "player_a" || role === "player_b")) {
         markEntered(clientUserId);
       }
     }, 3000);
     return () => window.clearInterval(intervalId);
-  }, [clientUserId, router, role, status]);
+  }, [clientUserId, router, role, liveStatus]);
 
   useEffect(() => {
-    if (status !== "live") return;
+    if (liveStatus !== "live") return;
     const id = window.setInterval(() => {
       fetch(`/api/matches/${matchId}/ai-tick`, { method: "POST" });
     }, 9000);
     return () => window.clearInterval(id);
-  }, [matchId, status]);
+  }, [matchId, liveStatus]);
 
   useEffect(() => {
     const container = chatScrollRef.current;
@@ -201,7 +210,7 @@ export function RealtimeChat({
             ? playerAIsAi && playerBIsAi
               ? "Both seats are AI-controlled. Watch the bots talk, vote, and reveal when ready."
               : "Watch the chat, vote on who is AI, and wait for the reveal."
-            : status === "waiting"
+            : liveStatus === "waiting"
               ? "Wait for the other seat to fill. You can chat once the match is live."
               : `Send messages as ${roleLabel(role)}. Do not reveal whether you chose human or AI.`}
         </p>
@@ -224,10 +233,10 @@ export function RealtimeChat({
             maxLength={280}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={`Message as ${roleLabel(role)}...`}
-            disabled={status === "waiting"}
+            disabled={liveStatus === "waiting"}
             className="min-h-14 min-w-0 flex-1 rounded-lg border border-line bg-panel px-4 text-base text-white outline-none focus:border-neon sm:min-h-12 sm:px-3 sm:text-sm"
           />
-          <button aria-label="Send" disabled={status === "waiting"} className="grid min-h-14 w-14 place-items-center rounded-lg bg-neon text-void disabled:opacity-40 sm:min-h-12 sm:w-12">
+          <button aria-label="Send" disabled={liveStatus === "waiting"} className="grid min-h-14 w-14 place-items-center rounded-lg bg-neon text-void disabled:opacity-40 sm:min-h-12 sm:w-12">
             <Send size={18} />
           </button>
         </form>

@@ -276,11 +276,22 @@ async function vote(supabase: any, input: any) {
 }
 
 async function voteStatsResponse(supabase: any, input: any) {
-  const { data, error } = await supabase.rpc("get_vote_stats", { p_match_id: input.matchId });
-  if (error) throw error;
-  const stats = normalizeVoteStats(data);
+  const matchId = String(input.matchId || "");
+  if (!matchId) throw new Error("Missing matchId.");
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("player_a_user_id, player_b_user_id")
+    .eq("id", matchId)
+    .single();
+  if (matchError) throw matchError;
+  const { data: votes, error: votesError } = await supabase
+    .from("votes")
+    .select("voter_user_id, vote")
+    .eq("match_id", matchId);
+  if (votesError) throw votesError;
+  const stats = buildVoteStats(votes ?? [], match.player_a_user_id, match.player_b_user_id);
   if (input.voterUserId) {
-    const { data: selected } = await supabase.from("votes").select("vote").eq("match_id", input.matchId).eq("voter_user_id", input.voterUserId).maybeSingle();
+    const { data: selected } = await supabase.from("votes").select("vote").eq("match_id", matchId).eq("voter_user_id", input.voterUserId).maybeSingle();
     return { ...stats, selectedVote: selected?.vote ?? null };
   }
   return stats;
@@ -388,11 +399,15 @@ async function injectAiIntoOpenSeat(supabase: any, matchId: string) {
   return { ok: await fillEmptySeatWithAi(supabase, match, true) };
 }
 
-function normalizeVoteStats(data: any) {
+function buildVoteStats(votes: { voter_user_id: string; vote: VoteChoice }[], playerAUserId: string | null, playerBUserId: string | null) {
+  const audienceVotes = votes.filter((row) => row.voter_user_id !== playerAUserId && row.voter_user_id !== playerBUserId);
+  const totalVotes = audienceVotes.length;
+  const playerAIsAiVotes = audienceVotes.filter((row) => row.vote === "player_a_ai" || row.vote === "both_ai").length;
+  const playerBIsAiVotes = audienceVotes.filter((row) => row.vote === "player_b_ai" || row.vote === "both_ai").length;
   return {
-    playerAIsAiPercent: Number(data?.playerAIsAiPercent ?? 0),
-    playerBIsAiPercent: Number(data?.playerBIsAiPercent ?? 0),
-    totalVotes: Number(data?.totalVotes ?? 0)
+    playerAIsAiPercent: percent(playerAIsAiVotes, totalVotes),
+    playerBIsAiPercent: percent(playerBIsAiVotes, totalVotes),
+    totalVotes
   };
 }
 
@@ -417,14 +432,15 @@ function buildRevealStats({
   playerBUserId: string | null;
   votes: { voter_user_id: string; vote: VoteChoice }[];
 }) {
-  const totalVotes = votes.length;
+  const audienceVotes = votes.filter((row) => row.voter_user_id !== playerAUserId && row.voter_user_id !== playerBUserId);
+  const totalVotes = audienceVotes.length;
   let correctVotes = 0;
   let playerAIsAiVotes = 0;
   let playerBIsAiVotes = 0;
   let playerAWrongGuesses = 0;
   let playerBWrongGuesses = 0;
 
-  for (const { vote } of votes) {
+  for (const { vote } of audienceVotes) {
     const guessedAType: ControlType = vote === "player_a_ai" || vote === "both_ai" ? "ai" : "human";
     const guessedBType: ControlType = vote === "player_b_ai" || vote === "both_ai" ? "ai" : "human";
 

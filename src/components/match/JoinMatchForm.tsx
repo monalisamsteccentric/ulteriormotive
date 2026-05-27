@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { ControlType, PlayerRole, PublicMatch } from "@/types/database";
 
@@ -35,6 +35,7 @@ export function JoinMatchForm({
   const [aiStrategy, setAiStrategy] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [editableInviteCode, setEditableInviteCode] = useState(inviteCode);
   const joiningSeat = openSeat(match);
   const isFull = Boolean(match && !joiningSeat);
   const isCreatorView = Boolean(createdMatchId && creatorSeat);
@@ -42,6 +43,20 @@ export function JoinMatchForm({
   useEffect(() => {
     setUsername(localStorage.getItem("hidden_username") ?? "Guest");
   }, []);
+
+  useEffect(() => {
+    setEditableInviteCode(inviteCode);
+  }, [inviteCode]);
+
+  function changeInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextInviteCode = editableInviteCode.replace(/\s+/g, "").toUpperCase();
+    if (!nextInviteCode) {
+      setError("Enter an invite code.");
+      return;
+    }
+    router.push(`/join/${encodeURIComponent(nextInviteCode)}`);
+  }
 
   async function join() {
     const userId = localStorage.getItem("hidden_user_id") ?? crypto.randomUUID();
@@ -71,6 +86,19 @@ export function JoinMatchForm({
       <section className="rounded-lg border border-line bg-ink p-4">
         <p className="text-xs font-black uppercase text-mist">Invite</p>
         <p className="text-4xl font-black text-neon">{inviteCode}</p>
+        <form onSubmit={changeInvite} className="mt-4 flex gap-2">
+          <input
+            value={editableInviteCode}
+            onChange={(event) => {
+              setEditableInviteCode(event.target.value);
+              setError("");
+            }}
+            autoComplete="off"
+            aria-label="Edit invite code"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-3 py-2 text-base font-black uppercase text-white outline-none focus:border-neon sm:text-sm"
+          />
+          <Button type="submit" variant="ghost">Use code</Button>
+        </form>
       </section>
       <section className="grid gap-3 rounded-lg border border-line bg-ink p-4 sm:grid-cols-2">
         <SeatCard label="Player A" state={match?.player_a_user_id ? "Taken" : "Open"} active={joiningSeat === "player_a" || creatorSeat === "player_a"} />

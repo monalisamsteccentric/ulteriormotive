@@ -497,14 +497,15 @@ function buildRevealStats({
   playerBUserId: string | null;
   votes: { voter_user_id: string; vote: VoteChoice }[];
 }): RevealStats {
-  const totalVotes = votes.length;
+  const audienceVotes = votes.filter((row) => row.voter_user_id !== playerAUserId && row.voter_user_id !== playerBUserId);
+  const totalVotes = audienceVotes.length;
   let correctVotes = 0;
   let playerAIsAiVotes = 0;
   let playerBIsAiVotes = 0;
   let playerAWrongGuesses = 0;
   let playerBWrongGuesses = 0;
 
-  for (const { vote } of votes) {
+  for (const { vote } of audienceVotes) {
     const guessedAType: ControlType = vote === "player_a_ai" || vote === "both_ai" ? "ai" : "human";
     const guessedBType: ControlType = vote === "player_b_ai" || vote === "both_ai" ? "ai" : "human";
 

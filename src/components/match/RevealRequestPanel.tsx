@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { BellRing } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { PublicMatch } from "@/types/database";
@@ -30,11 +31,14 @@ export function RevealRequestPanel({
   initialNow
 }: RevealRequestPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const forceAudience = searchParams.get("audience") === "1";
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(initialNow);
   const [requestedTimeLabel, setRequestedTimeLabel] = useState("");
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
   const syncMatchStatus = useCallback(async () => {
     const response = await fetch(`/api/matches/${matchId}`, { cache: "no-store" });
@@ -100,17 +104,25 @@ export function RevealRequestPanel({
   }, [matchId, router, status]);
 
   const role = useMemo(() => {
-    if (!userId) return "audience";
+    if (!userId || forceAudience) return "audience";
     if (userId === playerAUserId) return "player_a";
     if (userId === playerBUserId) return "player_b";
     return "audience";
-  }, [playerAUserId, playerBUserId, userId]);
+  }, [forceAudience, playerAUserId, playerBUserId, userId]);
 
   const revealElapsedMs = startedAt ? now - new Date(startedAt).getTime() : 0;
   const secondsLeft = Math.max(0, Math.ceil((MIN_REVEAL_MS - revealElapsedMs) / 1000));
   const locked = status !== "live" || secondsLeft > 0;
   const requestedByMe = Boolean(userId && revealRequestedByUserId === userId);
-  const requestedByOther = Boolean(userId && revealRequestedByUserId && revealRequestedByUserId !== userId);
+  const requestedByOther = Boolean(role !== "audience" && userId && revealRequestedByUserId && revealRequestedByUserId !== userId);
+
+  useEffect(() => {
+    if (requestedByOther) setAlertDismissed(false);
+  }, [revealRequestedByUserId, requestedByOther]);
+
+  function scrollToRevealPanel() {
+    document.getElementById("reveal-request-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   async function submit() {
     if (!userId) {
@@ -135,7 +147,26 @@ export function RevealRequestPanel({
   }
 
   return (
-    <section className="rounded-lg border border-line bg-ink p-4">
+    <section id="reveal-request-panel" className="rounded-lg border border-line bg-ink p-4">
+      {requestedByOther && !alertDismissed ? (
+        <div className="fixed inset-x-3 bottom-4 z-50 mx-auto max-w-md rounded-lg border border-neon/70 bg-void/95 p-4 shadow-glow backdrop-blur">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-neon text-void">
+              <BellRing size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-base font-black text-white sm:text-sm">Reveal was requested by the other player.</p>
+              <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-5">
+                Scroll down to the Reveal panel to accept the request and unlock the identities.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button type="button" onClick={scrollToRevealPanel}>Go to reveal</Button>
+                <Button type="button" variant="ghost" onClick={() => setAlertDismissed(true)}>Dismiss</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mb-3">
         <h2 className="text-xl font-black sm:text-lg">Reveal</h2>
         <p className="mt-1 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">

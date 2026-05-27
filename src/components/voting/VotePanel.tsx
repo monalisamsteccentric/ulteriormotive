@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PlayerRole, VoteChoice, VoteStats } from "@/types/database";
 import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 const options: { label: string; vote: VoteChoice }[] = [
-  { label: "A is AI", vote: "player_a_ai" },
-  { label: "B is AI", vote: "player_b_ai" },
-  { label: "Both AI", vote: "both_ai" },
-  { label: "None AI", vote: "none_ai" }
+  { label: "Both are AI", vote: "both_ai" },
+  { label: "Both are human", vote: "none_ai" },
+  { label: "A is human, B is AI", vote: "player_b_ai" },
+  { label: "B is human, A is AI", vote: "player_a_ai" }
 ];
 
 type VotePanelProps = {
@@ -25,6 +26,8 @@ type StatsResponse = VoteStats & {
 };
 
 export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initialStats }: VotePanelProps) {
+  const searchParams = useSearchParams();
+  const forceAudience = searchParams.get("audience") === "1";
   const [stats, setStats] = useState(initialStats);
   const [clientUserId, setClientUserId] = useState(userId);
   const [role, setRole] = useState<PlayerRole | "audience">("audience");
@@ -39,7 +42,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
 
   const syncStats = useCallback(async () => {
     const requestId = ++latestStatsRequestRef.current;
-    const id = clientUserId ?? localStorage.getItem("hidden_user_id");
+    const id = clientUserId ?? localStorage.getItem(forceAudience ? "hidden_audience_user_id" : "hidden_user_id");
     const params = new URLSearchParams({ matchId });
     if (id) params.set("voterUserId", id);
 
@@ -51,16 +54,16 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
       setStats(result);
       if ("selectedVote" in result) setSelected(result.selectedVote ?? null);
     }
-  }, [clientUserId, matchId]);
+  }, [clientUserId, forceAudience, matchId]);
 
   useEffect(() => {
     let id = clientUserId;
     if (!id) {
-      id = localStorage.getItem("hidden_user_id");
+      id = localStorage.getItem(forceAudience ? "hidden_audience_user_id" : "hidden_user_id");
       if (id) setClientUserId(id);
     }
-    setRole(id === playerAUserId ? "player_a" : id === playerBUserId ? "player_b" : "audience");
-  }, [clientUserId, playerAUserId, playerBUserId]);
+    setRole(forceAudience ? "audience" : id === playerAUserId ? "player_a" : id === playerBUserId ? "player_b" : "audience");
+  }, [clientUserId, forceAudience, playerAUserId, playerBUserId]);
 
   useEffect(() => {
     syncStats();
@@ -84,8 +87,9 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
   }, [matchId]);
 
   async function submit(vote: VoteChoice) {
-    const id = clientUserId ?? localStorage.getItem("hidden_user_id") ?? crypto.randomUUID();
-    localStorage.setItem("hidden_user_id", id);
+    const storageKey = forceAudience ? "hidden_audience_user_id" : "hidden_user_id";
+    const id = clientUserId ?? localStorage.getItem(storageKey) ?? crypto.randomUUID();
+    localStorage.setItem(storageKey, id);
     setClientUserId(id);
     setError("");
     const response = await fetch("/api/votes", {

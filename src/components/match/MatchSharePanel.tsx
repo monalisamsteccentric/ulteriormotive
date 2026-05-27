@@ -8,7 +8,7 @@ export function MatchSharePanel({ matchId }: { matchId: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setUrl(`${window.location.origin}/match/${matchId}`);
+    setUrl(`${window.location.origin}/match/${matchId}?audience=1`);
   }, [matchId]);
 
   async function copy() {

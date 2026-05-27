@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ArrowRight, Eye, MessageCircle, Radio } from "lucide-react";
+import { Eye, Radio } from "lucide-react";
 
 type HeroPhoneProps = {
   image: string;
@@ -32,13 +32,6 @@ export function HeroPhone({ image, title, subtitle, align = "left", featured }: 
         </div>
         <h2 className="max-w-[300px] text-4xl font-black leading-none tracking-normal text-white sm:text-3xl">{title}</h2>
         <p className="mt-3 max-w-[300px] text-base font-semibold leading-7 text-white/90 sm:text-xs sm:leading-5">{subtitle}</p>
-      </div>
-      <div className="absolute bottom-12 left-5 right-5 z-10 flex h-16 items-center justify-between rounded-full bg-white/35 px-2 pr-4 text-base font-black text-white backdrop-blur-xl sm:left-6 sm:right-6 sm:h-14 sm:text-sm">
-        <span className="grid h-11 w-11 place-items-center rounded-full bg-white/25">
-          <MessageCircle size={20} />
-        </span>
-        <span>Start guessing</span>
-        <ArrowRight size={19} />
       </div>
     </article>
   );
