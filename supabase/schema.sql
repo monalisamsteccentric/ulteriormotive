@@ -64,6 +64,15 @@ create table moderation_warnings (
   unique(match_id, user_id)
 );
 
+create table audience_viewers (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null references matches(id) on delete cascade,
+  viewer_user_id text not null,
+  last_seen_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique(match_id, viewer_user_id)
+);
+
 create or replace view public_matches as
 select
   id,
@@ -187,6 +196,7 @@ alter table matches enable row level security;
 alter table messages enable row level security;
 alter table votes enable row level security;
 alter table moderation_warnings enable row level security;
+alter table audience_viewers enable row level security;
 
 create policy "profiles readable" on profiles for select using (true);
 create policy "profiles upsert own" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -198,6 +208,7 @@ create policy "votes insertable by clients" on votes for insert with check (true
 create policy "votes updatable by owner token" on votes for update using (true) with check (true);
 create policy "votes readable aggregate only" on votes for select using (auth.role() = 'service_role');
 create policy "service role manages moderation warnings" on moderation_warnings for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "service role manages audience viewers" on audience_viewers for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 
 grant select on public_matches to anon, authenticated;
 grant select on public_messages to anon, authenticated;

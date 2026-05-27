@@ -36,6 +36,10 @@ Deno.serve(async (req) => {
         return json(req, await vote(supabase, body));
       case "vote-stats":
         return json(req, await voteStatsResponse(supabase, body));
+      case "audience-register":
+        return json(req, await registerAudienceViewer(supabase, body));
+      case "audience-stats":
+        return json(req, await audienceStats(supabase, body));
       case "reveal-stats":
         return json(req, await revealStats(supabase, body));
       case "waiting-matches":
@@ -310,7 +314,8 @@ function heuristicInappropriateCheck(text: string) {
 }
 
 function isMissingTableError(error: any) {
-  return error?.code === "42P01" || String(error?.message ?? "").includes("moderation_warnings");
+  const message = String(error?.message ?? "");
+  return error?.code === "42P01" || message.includes("moderation_warnings") || message.includes("audience_viewers");
 }
 
 function nextAiRole(lastMessage: any, playerAIsAi: boolean, playerBIsAi: boolean): PlayerRole | null {
@@ -382,6 +387,37 @@ async function voteStatsResponse(supabase: any, input: any) {
     return { ...stats, selectedVote: selected?.vote ?? null };
   }
   return stats;
+}
+
+async function registerAudienceViewer(supabase: any, input: any) {
+  const matchId = String(input.matchId || "");
+  const viewerUserId = String(input.viewerUserId || "");
+  if (!matchId || !viewerUserId) throw new Error("Missing matchId or viewerUserId.");
+
+  const { error } = await supabase.from("audience_viewers").upsert(
+    {
+      match_id: matchId,
+      viewer_user_id: viewerUserId,
+      last_seen_at: new Date().toISOString()
+    },
+    { onConflict: "match_id,viewer_user_id" }
+  );
+  if (isMissingTableError(error)) return { joinedCount: 0 };
+  if (error) throw error;
+  return audienceStats(supabase, input);
+}
+
+async function audienceStats(supabase: any, input: any) {
+  const matchId = String(input.matchId || "");
+  if (!matchId) throw new Error("Missing matchId.");
+
+  const { count, error } = await supabase
+    .from("audience_viewers")
+    .select("id", { count: "exact", head: true })
+    .eq("match_id", matchId);
+  if (isMissingTableError(error)) return { joinedCount: 0 };
+  if (error) throw error;
+  return { joinedCount: count ?? 0 };
 }
 
 async function revealStats(supabase: any, input: any) {

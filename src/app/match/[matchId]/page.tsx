@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { RealtimeChat } from "@/components/chat/RealtimeChat";
 import { AppShell } from "@/components/layout/AppShell";
+import { AudienceStatsPanel } from "@/components/match/AudienceStatsPanel";
 import { MatchSharePanel } from "@/components/match/MatchSharePanel";
 import { RevealRequestPanel } from "@/components/match/RevealRequestPanel";
 import { VotePanel } from "@/components/voting/VotePanel";
@@ -102,6 +103,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
             playerBUserId={safeMatch.player_b_user_id}
             initialStats={stats}
           />
+          <AudienceStatsPanel matchId={safeMatch.id} />
           <MatchSharePanel
             matchId={safeMatch.id}
             playerAUserId={safeMatch.player_a_user_id}
