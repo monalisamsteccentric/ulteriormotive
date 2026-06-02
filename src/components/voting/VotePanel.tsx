@@ -7,10 +7,10 @@ import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 const options: { label: string; vote: VoteChoice }[] = [
-  { label: "Both are AI", vote: "both_ai" },
-  { label: "Both are human", vote: "none_ai" },
-  { label: "A is human, B is AI", vote: "player_b_ai" },
-  { label: "B is human, A is AI", vote: "player_a_ai" }
+  { label: "Player A is AI + Player B is AI", vote: "both_ai" },
+  { label: "Player A is Human + Player B is Human", vote: "none_ai" },
+  { label: "Player A is Human + Player B is AI", vote: "player_b_ai" },
+  { label: "Player A is AI + Player B is Human", vote: "player_a_ai" }
 ];
 
 type VotePanelProps = {
@@ -119,19 +119,20 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
             { label: "Player A is AI", vote: "player_a_ai" as const }
           ]
         : null;
-  const title = playerGuessOptions ? "Score guess" : "Suspicion";
+  const title = "Prediction Board";
   const subtitle = playerGuessOptions
     ? "Guess your opposite player. Correct: +30%. Wrong: -30%."
-    : "Vote on who is AI.";
+    : "Decide who is human, who is AI, and who is bluffing.";
 
   return (
     <section className="rounded-lg border border-line bg-ink p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black sm:text-lg">{title}</h2>
+          <p className="text-xs font-black uppercase text-neon">Audience suspicion</p>
+          <h2 className="mt-1 text-2xl font-black sm:text-xl">{title}</h2>
           <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-normal">{subtitle}</p>
         </div>
-        <span className="text-sm font-bold text-mist sm:text-xs">{stats.totalVotes} votes</span>
+        <span className="rounded-lg border border-line bg-panel px-2 py-1 text-sm font-black uppercase text-mist sm:text-xs">{stats.totalVotes} votes cast</span>
       </div>
       {playerGuessOptions ? (
         <div className="mb-4 grid gap-2">
@@ -142,7 +143,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
           ))}
         </div>
       ) : (
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        <div className="mb-4 grid gap-2">
           {options.map((option) => (
             <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} onClick={() => submit(option.vote)}>
               {selected === option.vote ? "Voted: " : ""}{option.label}
@@ -151,8 +152,8 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
         </div>
       )}
       <div className="mb-4 grid gap-3 text-base font-bold sm:gap-2 sm:text-sm">
-        <Meter label="Player A" value={stats.playerAIsAiPercent} />
-        <Meter label="Player B" value={stats.playerBIsAiPercent} />
+        <Meter label="Player A is AI" value={stats.playerAIsAiPercent} />
+        <Meter label="Player B is AI" value={stats.playerBIsAiPercent} />
       </div>
       {error ? <p className="mt-3 text-sm font-bold text-shock">{error}</p> : null}
     </section>
@@ -164,7 +165,7 @@ function Meter({ label, value }: { label: string; value: number }) {
     <div>
       <div className="mb-2 flex justify-between text-mist sm:mb-1">
         <span>{label}</span>
-        <span>{value}% AI</span>
+        <span>{value}%</span>
       </div>
       <div className="h-3 rounded-full bg-panel sm:h-2">
         <div className="h-3 rounded-full bg-neon sm:h-2" style={{ width: `${value}%` }} />

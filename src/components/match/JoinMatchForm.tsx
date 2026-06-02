@@ -39,6 +39,17 @@ export function JoinMatchForm({
   const joiningSeat = openSeat(match);
   const isFull = Boolean(match && !joiningSeat);
   const isCreatorView = Boolean(createdMatchId && creatorSeat);
+  const playerAClaimed = Boolean(match?.player_a_user_id);
+  const playerBClaimed = Boolean(match?.player_b_user_id);
+  const claimedSeats = Number(playerAClaimed) + Number(playerBClaimed);
+  const statusHeadline = !match ? "MATCH NOT FOUND" : isFull ? "MATCH FULL" : claimedSeats > 0 ? "MATCH READY" : "INVITE OPEN";
+  const statusBody = !match
+    ? "Ask the host for a fresh invite."
+    : isFull
+      ? "Both seats are claimed. You can still watch from the audience link once the match opens."
+      : claimedSeats > 0
+        ? `${playerAClaimed ? "Player A" : "Player B"} has entered. One seat remains.`
+        : "Both seats are waiting. Claim a public identity and start the deception.";
 
   useEffect(() => {
     setUsername(localStorage.getItem("hidden_username") ?? "Guest");
@@ -82,10 +93,25 @@ export function JoinMatchForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <section className="rounded-lg border border-neon/60 bg-ink p-5 shadow-glow">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase text-neon">{statusHeadline}</p>
+            <p className="mt-2 max-w-xl text-2xl font-black leading-tight text-white">{statusBody}</p>
+            {!isFull && match ? (
+              <p className="mt-2 text-base font-bold leading-7 text-mist">Claim the open seat before the timer expires.</p>
+            ) : null}
+          </div>
+          <div className="rounded-lg border border-line bg-panel px-4 py-3">
+            <p className="text-xs font-black uppercase text-mist">Invite code</p>
+            <p className="mt-1 text-4xl font-black text-neon">{inviteCode}</p>
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-lg border border-line bg-ink p-4">
         <p className="text-xs font-black uppercase text-mist">Invite</p>
-        <p className="text-4xl font-black text-neon">{inviteCode}</p>
         <form onSubmit={changeInvite} className="mt-4 flex gap-2">
           <input
             value={editableInviteCode}
@@ -101,8 +127,8 @@ export function JoinMatchForm({
         </form>
       </section>
       <section className="grid gap-3 rounded-lg border border-line bg-ink p-4 sm:grid-cols-2">
-        <SeatCard label="Player A" state={match?.player_a_user_id ? "Taken" : "Open"} active={joiningSeat === "player_a" || creatorSeat === "player_a"} />
-        <SeatCard label="Player B" state={match?.player_b_user_id ? "Taken" : "Open"} active={joiningSeat === "player_b" || creatorSeat === "player_b"} />
+        <SeatCard label="Player A" state={match?.player_a_user_id ? "CLAIMED" : "OPEN"} active={joiningSeat === "player_a" || creatorSeat === "player_a"} claimed={playerAClaimed} />
+        <SeatCard label="Player B" state={match?.player_b_user_id ? "CLAIMED" : "OPEN"} active={joiningSeat === "player_b" || creatorSeat === "player_b"} claimed={playerBClaimed} />
       </section>
       <section className="rounded-lg border border-line bg-panel p-4">
         <p className="text-xs font-black uppercase text-mist">Your next step</p>
@@ -114,7 +140,7 @@ export function JoinMatchForm({
         ) : joiningSeat ? (
           <>
             <p className="mt-1 text-2xl font-black text-neon">You will join as {seatLabel(joiningSeat)}</p>
-            <p className="mt-2 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Choose whether this seat is controlled by you or by AI, then join the match.</p>
+            <p className="mt-2 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Choose who controls this seat. The audience will not know until the reveal.</p>
           </>
         ) : (
           <>
@@ -124,31 +150,40 @@ export function JoinMatchForm({
         )}
       </section>
       <div className="grid gap-2 sm:grid-cols-2">
-        <Button onClick={copy}>{copied ? "Copied" : "Copy link"}</Button>
-        <a className="inline-flex min-h-14 items-center justify-center rounded-lg border border-line bg-panel px-4 text-base font-black sm:min-h-12 sm:text-sm" href={`https://wa.me/?text=${encodeURIComponent(inviteUrl)}`}>WhatsApp</a>
+        <Button variant="ghost" onClick={copy}>{copied ? "Copied" : "Copy link"}</Button>
+        <a className="inline-flex min-h-14 items-center justify-center rounded-lg border border-line bg-panel px-4 text-base font-black text-white sm:min-h-12 sm:text-sm" href={`https://wa.me/?text=${encodeURIComponent(inviteUrl)}`}>WhatsApp</a>
         <Button variant="ghost" onClick={() => navigator.clipboard.writeText(`Can you tell who is human? ${inviteUrl}`)}>Instagram caption</Button>
-        <a className="inline-flex min-h-14 items-center justify-center rounded-lg border border-line bg-panel px-4 text-base font-black sm:min-h-12 sm:text-sm" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Can you tell who is human? ${inviteUrl}`)}`}>X / Twitter</a>
+        <a className="inline-flex min-h-14 items-center justify-center rounded-lg border border-line bg-panel px-4 text-base font-black text-white sm:min-h-12 sm:text-sm" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Can you tell who is human? ${inviteUrl}`)}`}>X / Twitter</a>
         <Button variant="ghost" onClick={() => navigator.share?.({ url: inviteUrl, text: "Join my Ulterior Motive match" })}>Native share</Button>
       </div>
       {isCreatorView ? (
-        <Button variant="ghost" className="w-full" onClick={() => router.push(`/match/${createdMatchId}`)}>Enter waiting room</Button>
+        <Button className="w-full" onClick={() => router.push(`/match/${createdMatchId}`)}>Enter Waiting Room</Button>
       ) : null}
       {!isCreatorView && joiningSeat ? (
         <>
-      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 text-base outline-none focus:border-neon" value={username} onChange={(e) => setUsername(e.target.value)} />
-      <h2 className="text-base font-black uppercase text-mist sm:text-sm">Do you want to play yourself or let AI play for you?</h2>
+      <input className="w-full rounded-lg border border-line bg-panel px-4 py-4 text-base font-bold text-white outline-none focus:border-neon" value={username} onChange={(e) => setUsername(e.target.value)} />
+      <h2 className="text-base font-black uppercase text-mist sm:text-sm">Who Controls This Player?</h2>
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => setControlType("human")} className={`min-h-14 rounded-lg border px-3 text-base font-black sm:min-h-12 sm:text-sm ${controlType === "human" ? "border-shock bg-shock/20" : "border-line bg-panel text-mist"}`}>Play myself</button>
-        <button onClick={() => setControlType("ai")} className={`min-h-14 rounded-lg border px-3 text-base font-black sm:min-h-12 sm:text-sm ${controlType === "ai" ? "border-shock bg-shock/20" : "border-line bg-panel text-mist"}`}>Let AI play</button>
+        <button onClick={() => setControlType("human")} className={`min-h-16 rounded-lg border px-3 text-base font-black sm:min-h-14 sm:text-sm ${controlType === "human" ? "border-shock bg-shock/25 text-white shadow-glow" : "border-line bg-panel text-mist"}`}>{"\uD83D\uDC64"} Play Myself</button>
+        <button onClick={() => setControlType("ai")} className={`min-h-16 rounded-lg border px-3 text-base font-black sm:min-h-14 sm:text-sm ${controlType === "ai" ? "border-shock bg-shock/25 text-white shadow-glow" : "border-line bg-panel text-mist"}`}>{"\uD83E\uDD16"} Let AI Play</button>
       </div>
       {controlType === "ai" ? (
         <AiStrategyBox value={aiStrategy} onChange={setAiStrategy} />
       ) : null}
-      <p className="text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Nobody sees that choice until reveal.</p>
+      <p className="rounded-lg border border-neon/40 bg-neon/10 p-4 text-base font-bold leading-7 text-white sm:text-sm sm:leading-6">Nobody sees that choice until reveal.</p>
       {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
-      <Button className="w-full" onClick={join}>Join match</Button>
+      <Button className="w-full text-lg sm:text-base" onClick={join}>Join Match</Button>
         </>
       ) : null}
+      <section className="rounded-lg border border-line bg-ink/90 p-4">
+        <p className="text-sm font-black uppercase text-mist">What happens next?</p>
+        <ol className="mt-3 grid gap-2 text-base font-bold leading-7 text-white sm:grid-cols-2">
+          <li className="rounded-lg border border-line bg-panel p-3">1. Both players enter.</li>
+          <li className="rounded-lg border border-line bg-panel p-3">2. Roles remain hidden.</li>
+          <li className="rounded-lg border border-line bg-panel p-3">3. The audience watches.</li>
+          <li className="rounded-lg border border-line bg-panel p-3">4. The reveal exposes the truth.</li>
+        </ol>
+      </section>
     </div>
   );
 }
@@ -169,12 +204,15 @@ function AiStrategyBox({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
-function SeatCard({ label, state, active }: { label: string; state: string; active: boolean }) {
+function SeatCard({ label, state, active, claimed }: { label: string; state: string; active: boolean; claimed: boolean }) {
   return (
-    <div className={`rounded-lg border p-4 ${active ? "border-neon bg-neon/10" : "border-line bg-panel"}`}>
-      <p className="text-xs font-black uppercase text-mist">{label}</p>
-      <p className="mt-1 text-xl font-black text-white">{state}</p>
-      {active ? <p className="mt-2 text-sm font-black uppercase text-neon sm:text-xs">Your seat</p> : null}
+    <div className={`min-h-40 rounded-lg border p-5 ${active ? "border-neon bg-neon/10" : claimed ? "border-shock/60 bg-shock/10" : "border-line bg-panel"}`}>
+      <p className="text-sm font-black uppercase text-mist">{label}</p>
+      <p className={`mt-3 text-4xl font-black ${claimed ? "text-white" : "text-neon"}`}>{state}</p>
+      <p className="mt-3 text-sm font-bold leading-6 text-mist">
+        {claimed ? "A challenger is inside the game." : "One seat remains. Claim it before suspicion starts."}
+      </p>
+      {active ? <p className="mt-3 text-sm font-black uppercase text-neon sm:text-xs">Your seat</p> : null}
     </div>
   );
 }

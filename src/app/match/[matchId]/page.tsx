@@ -46,7 +46,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
   const isWaiting = effectiveStatus === "waiting";
   const bothSeatsFilled = Boolean(safeMatch.player_a_user_id && safeMatch.player_b_user_id);
   const isWaitingForSeat = isWaiting && !bothSeatsFilled;
-  const statusLabel = isWaiting && bothSeatsFilled ? "Waiting for both players to enter" : isWaiting ? "Waiting for second player" : effectiveStatus.toUpperCase();
+  const statusLabel = isWaiting && bothSeatsFilled ? "Both seats claimed" : isWaiting ? "MATCH CREATED" : effectiveStatus.toUpperCase();
   const realMessages = messages?.filter((message) => !(hasPlayerMessages && message.sender_role === "system" && message.message.toLowerCase().includes("waiting for both players"))) ?? [];
   const safeMessages = ((realMessages.length ? realMessages : [
     {
@@ -54,7 +54,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
       match_id: safeMatch.id,
       sender_role: "system",
       sender_user_id: null,
-      message: isWaiting ? statusLabel : "Match is live. Identities are hidden.",
+      message: isWaiting ? "MATCH CREATED. Player A has entered. Waiting for challenger... The conversation begins when both seats are occupied." : "Match is live. Identities are hidden.",
       created_at: new Date().toISOString()
     }
   ]) ?? []) as Message[];
@@ -69,12 +69,17 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
   return (
     <AppShell>
       <WaitingTimer matchId={safeMatch.id} waitUntil={safeMatch.wait_until} isWaitingForSeat={isWaitingForSeat} initialNow={Date.now()} />
-      <section className="mb-3 rounded-lg border border-line bg-ink p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="mb-6 rounded-lg border border-neon/50 bg-ink/95 p-5 shadow-glow">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-black uppercase text-mist sm:text-xs">Match status</p>
-            <p className={`mt-1 text-2xl font-black ${isWaiting ? "text-neon" : "text-shock"}`}>
+            <p className="text-sm font-black uppercase text-neon sm:text-xs">Live match room</p>
+            <p className={`mt-2 text-4xl font-black leading-tight sm:text-5xl ${isWaiting ? "text-white" : "text-shock"}`}>
               {statusLabel}
+            </p>
+            <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-mist">
+              {isWaiting
+                ? "Player A has entered. Waiting for challenger... The conversation begins when both seats are occupied."
+                : "Watch the conversation closely. Every pause, bluff, and contradiction matters."}
             </p>
           </div>
           <div className="text-left sm:text-right">
@@ -82,12 +87,12 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
             <p className="mt-1 text-xl font-black text-white">{safeMatch.invite_code}</p>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <MatchSeat label="Player A" filled={Boolean(safeMatch.player_a_user_id)} entered={Boolean(safeMatch.player_a_entered_at)} />
           <MatchSeat label="Player B" filled={Boolean(safeMatch.player_b_user_id)} entered={Boolean(safeMatch.player_b_entered_at)} />
         </div>
       </section>
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
         <RealtimeChat
           matchId={safeMatch.id}
           initialMessages={safeMessages}
@@ -99,6 +104,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
           playerBIsAi={safeMatch.player_b_revealed_type === "ai"}
         />
         <div className="space-y-3">
+          <HowToWinPanel />
           <VotePanel
             matchId={safeMatch.id}
             userId={null}
@@ -136,9 +142,25 @@ function isUuid(value: string | null): value is string {
 
 function MatchSeat({ label, filled, entered }: { label: string; filled: boolean; entered: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 ${entered ? "border-neon bg-neon/10" : filled ? "border-line bg-panel" : "border-line bg-panel/70"}`}>
+    <div className={`rounded-lg border p-4 ${entered ? "border-neon bg-neon/10" : filled ? "border-line bg-panel" : "border-line bg-panel/70"}`}>
       <p className="text-sm font-black uppercase text-mist sm:text-xs">{label}</p>
-      <p className="mt-1 text-lg font-black text-white">{entered ? "In chatroom" : filled ? "Seat filled" : "Waiting"}</p>
+      <p className="mt-1 text-2xl font-black text-white">{entered ? "IN CHATROOM" : filled ? "CLAIMED" : "OPEN"}</p>
+      <p className="mt-2 text-sm font-bold leading-6 text-mist">
+        {entered ? "Ready to deceive or detect." : filled ? "Waiting to enter the chat." : "One seat remains."}
+      </p>
     </div>
+  );
+}
+
+function HowToWinPanel() {
+  return (
+    <section className="rounded-lg border border-line bg-ink p-4">
+      <p className="text-sm font-black uppercase text-neon sm:text-xs">How to win</p>
+      <div className="mt-3 grid gap-2 text-sm font-bold leading-6 text-white">
+        <p className="rounded-lg border border-line bg-panel p-3"><span className="font-black text-neon">Human:</span> Correctly identify the AI.</p>
+        <p className="rounded-lg border border-line bg-panel p-3"><span className="font-black text-shock">AI:</span> Convince people you are human.</p>
+        <p className="rounded-lg border border-line bg-panel p-3"><span className="font-black text-white">Audience:</span> Vote correctly before reveal.</p>
+      </div>
+    </section>
   );
 }

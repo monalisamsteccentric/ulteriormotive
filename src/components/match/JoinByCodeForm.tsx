@@ -20,9 +20,10 @@ export function JoinByCodeForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-ink p-4">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-ink p-5 shadow-glow">
       <label className="block">
-        <span className="text-sm font-black uppercase text-mist sm:text-xs">Match ID</span>
+        <span className="text-sm font-black uppercase text-neon sm:text-xs">Invite code</span>
+        <p className="mt-1 text-base font-bold leading-7 text-mist">Enter the code and claim the open seat before the reveal clock starts.</p>
         <input
           value={inviteCode}
           onChange={(event) => {
@@ -32,11 +33,11 @@ export function JoinByCodeForm() {
           autoFocus
           autoComplete="off"
           placeholder="ABC123"
-          className="mt-2 w-full rounded-lg border border-line bg-panel px-4 py-3 text-lg font-black uppercase tracking-[0.18em] text-white outline-none focus:border-neon"
+          className="mt-3 w-full rounded-lg border border-line bg-panel px-4 py-4 text-2xl font-black uppercase tracking-[0.18em] text-white outline-none focus:border-neon"
         />
       </label>
       {error ? <p className="text-base font-bold text-shock sm:text-sm">{error}</p> : null}
-      <Button type="submit" className="w-full">Join match</Button>
+      <Button type="submit" className="w-full text-lg sm:text-base">Join Match</Button>
     </form>
   );
 }

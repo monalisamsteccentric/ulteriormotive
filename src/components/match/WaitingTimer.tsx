@@ -38,13 +38,13 @@ export function WaitingTimer({
   const seconds = secondsLeft % 60;
 
   return (
-    <section className="mb-3 rounded-lg border border-neon bg-ink p-4">
-      <p className="text-sm font-black uppercase text-mist sm:text-xs">Waiting timer</p>
+    <section className="mb-5 rounded-lg border border-neon bg-ink p-4 shadow-glow">
+      <p className="text-sm font-black uppercase text-neon sm:text-xs">Waiting for challenger...</p>
       <p className="mt-1 text-3xl font-black text-neon">
         {minutes}:{String(seconds).padStart(2, "0")}
       </p>
       <p className="mt-2 text-sm font-bold text-mist">
-        Waiting for someone to enter. If the timer expires before another player joins, this invite will show as expired.
+        One seat remains. The match begins when both players arrive.
       </p>
     </section>
   );

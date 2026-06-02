@@ -32,7 +32,13 @@ export default async function JoinPage({
 
   return (
     <AppShell>
-      <h1 className="mb-4 text-3xl font-black">Join match</h1>
+      <section className="mb-7">
+        <p className="text-sm font-black uppercase text-neon">Invitation intercepted</p>
+        <h1 className="mt-2 text-5xl font-black leading-none text-white sm:text-7xl">Join Match</h1>
+        <p className="mt-4 max-w-3xl text-lg font-bold leading-8 text-mist">
+          Take the open seat before the timer expires. Nobody will know who controls you until reveal.
+        </p>
+      </section>
       <JoinMatchForm
         inviteCode={normalizedInviteCode}
         inviteUrl={inviteUrl(normalizedInviteCode)}

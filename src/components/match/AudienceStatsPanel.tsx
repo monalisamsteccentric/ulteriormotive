@@ -83,10 +83,11 @@ export function AudienceStatsPanel({ matchId }: { matchId: string }) {
 
   return (
     <section className="rounded-lg border border-line bg-ink p-4">
-      <p className="text-sm font-black uppercase text-mist sm:text-xs">Audience</p>
+      <p className="text-sm font-black uppercase text-neon sm:text-xs">Audience activity</p>
+      <p className="mt-1 text-sm font-bold leading-6 text-mist">Suspicion moves as people watch, vote, and wait for the reveal.</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <AudienceCount icon="joined" label="Joined" value={joinedCount} />
-        <AudienceCount icon="active" label="Watching now" value={activeCount} />
+        <AudienceCount icon="joined" label="Audience Joined" value={joinedCount} />
+        <AudienceCount icon="active" label="Watching Now" value={activeCount} />
       </div>
     </section>
   );

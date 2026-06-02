@@ -155,12 +155,12 @@ export function RevealRequestPanel({
               <BellRing size={18} />
             </div>
             <div className="min-w-0">
-              <p className="text-base font-black text-white sm:text-sm">Reveal was requested by the other player.</p>
+              <p className="text-base font-black text-white sm:text-sm">Reveal Truth was requested by the other player.</p>
               <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-5">
-                Scroll down to the Reveal panel to accept the request and unlock the identities.
+                Scroll down to accept the request and expose the identities.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Button type="button" onClick={scrollToRevealPanel}>Go to reveal</Button>
+                <Button type="button" onClick={scrollToRevealPanel}>Go to Reveal Truth</Button>
                 <Button type="button" variant="ghost" onClick={() => setAlertDismissed(true)}>Dismiss</Button>
               </div>
             </div>
@@ -168,26 +168,27 @@ export function RevealRequestPanel({
         </div>
       ) : null}
       <div className="mb-3">
-        <h2 className="text-xl font-black sm:text-lg">Reveal</h2>
+        <p className="text-xs font-black uppercase text-neon">Reveal requests</p>
+        <h2 className="mt-1 text-2xl font-black sm:text-xl">Reveal Truth</h2>
         <p className="mt-1 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">
           {status === "revealed" || status === "completed"
             ? "Identities are unlocked."
             : secondsLeft > 0
               ? `Reveal unlocks in ${secondsLeft}s.`
-              : "Reveal needs approval from both players."}
+              : "Request a reveal when you think you've solved the match."}
         </p>
       </div>
       {revealRequestedByUserId ? (
         <div className="mb-3 rounded-lg border border-line bg-panel p-3 text-base font-bold leading-7 text-white sm:text-sm sm:leading-normal">
-          {requestedByMe ? "You requested reveal. Waiting for the other player." : "The other player requested reveal."}
+          {requestedByMe ? "You requested Reveal Truth. Waiting for the other player." : "The other player requested Reveal Truth."}
           {requestedTimeLabel ? <p className="mt-1 text-sm text-mist sm:text-xs">Requested {requestedTimeLabel}</p> : null}
         </div>
       ) : null}
       {role === "audience" ? (
-        <p className="text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Audience can watch and vote, but only players can reveal.</p>
+        <p className="text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Audience can watch and vote, but only players can trigger Reveal Truth.</p>
       ) : (
         <Button className="w-full" disabled={busy || locked || requestedByMe} onClick={submit}>
-          {requestedByOther ? "Agree and reveal" : requestedByMe ? "Waiting for approval" : "Request reveal"}
+          {requestedByOther ? "Agree and Reveal Truth" : requestedByMe ? "Waiting for approval" : "Reveal Truth"}
         </Button>
       )}
       {error ? <p className="mt-3 text-sm font-bold text-shock">{error}</p> : null}

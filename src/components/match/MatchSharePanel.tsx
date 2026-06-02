@@ -61,9 +61,10 @@ export function MatchSharePanel({
   }
 
   return (
-    <section className="rounded-lg border border-line bg-ink p-4 space-y-3">
-      <p className="text-sm font-black uppercase text-mist sm:text-xs">Audience match link</p>
-      <p className="mt-2 break-all text-base font-black text-white sm:text-sm">{matchId}</p>
+    <section className="rounded-lg border border-line bg-ink/85 p-4 space-y-3">
+      <p className="text-sm font-black uppercase text-mist sm:text-xs">Bring the audience</p>
+      <p className="mt-1 text-sm font-bold leading-6 text-mist">Share quietly. Let them judge the conversation without seeing hidden roles.</p>
+      <p className="mt-2 break-all text-sm font-black text-white/80 sm:text-xs">{matchId}</p>
       <label className="block">
         <span className="text-sm font-black uppercase text-mist sm:text-xs">Share message</span>
         <textarea
@@ -74,7 +75,7 @@ export function MatchSharePanel({
             setMessageTouched(true);
             setCopied(false);
           }}
-          className="mt-2 min-h-32 w-full resize-none rounded-lg border border-line bg-panel px-3 py-3 text-sm font-bold leading-6 text-white outline-none focus:border-neon"
+          className="mt-2 min-h-28 w-full resize-none rounded-lg border border-line bg-panel px-3 py-3 text-sm font-bold leading-6 text-white outline-none focus:border-neon"
         />
       </label>
       <div className="grid grid-cols-2 gap-2">

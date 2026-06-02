@@ -33,17 +33,29 @@ export function CreateMatchForm() {
   }
 
   return (
-    <div className="space-y-4">
-      <input className="w-full rounded-lg border border-line bg-panel px-4 py-3 text-base outline-none focus:border-neon" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
-      <Choice title="Visible seat" options={[["player_a", "Player A"], ["player_b", "Player B"]]} value={role} onChange={(v) => setRole(v as PlayerRole)} />
-      <Choice title="Secret control" options={[["human", "Play myself"], ["ai", "Let AI play"]]} value={controlType} onChange={(v) => setControlType(v as ControlType)} />
-      {controlType === "ai" ? (
-        <AiStrategyBox value={aiStrategy} onChange={setAiStrategy} />
-      ) : null}
-      <p className="text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">This choice is stored server-side only. Viewers only see Player A and Player B.</p>
-      <Choice title="Wait timer" options={[["5", "5 min"], ["30", "30 min"], ["60", "1 hour"]]} value={String(waitMinutes)} onChange={(v) => setWaitMinutes(Number(v) as 5 | 30 | 60)} />
-      {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
-      <Button className="w-full" onClick={create}>Create invite</Button>
+    <div className="rounded-lg border border-line bg-ink/90 p-4 shadow-glow backdrop-blur sm:p-6">
+      <div className="grid gap-5">
+        <label className="block">
+          <span className="text-sm font-black uppercase text-mist">Your display name</span>
+          <input
+            className="mt-2 w-full rounded-lg border border-line bg-panel px-4 py-4 text-lg font-bold text-white outline-none focus:border-neon"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+          />
+        </label>
+        <Choice title="Choose Your Public Identity" options={[["player_a", "Player A"], ["player_b", "Player B"]]} value={role} onChange={(v) => setRole(v as PlayerRole)} />
+        <Choice title="Who Controls This Player?" options={[["human", "\uD83D\uDC64 Play Myself"], ["ai", "\uD83E\uDD16 Let AI Play"]]} value={controlType} onChange={(v) => setControlType(v as ControlType)} />
+        {controlType === "ai" ? (
+          <AiStrategyBox value={aiStrategy} onChange={setAiStrategy} />
+        ) : null}
+        <p className="rounded-lg border border-neon/40 bg-neon/10 p-4 text-base font-bold leading-7 text-white">
+          The audience will only see Player A and Player B. Your control choice remains hidden until reveal.
+        </p>
+        <Choice title="How long should we wait for a challenger?" options={[["5", "5 min"], ["30", "30 min"], ["60", "1 hour"]]} value={String(waitMinutes)} onChange={(v) => setWaitMinutes(Number(v) as 5 | 30 | 60)} />
+        {error ? <p className="text-sm font-bold text-shock">{error}</p> : null}
+        <Button className="w-full text-lg sm:text-base" onClick={create}>Create Invite</Button>
+      </div>
     </div>
   );
 }
@@ -68,9 +80,9 @@ function Choice({ title, options, value, onChange }: { title: string; options: [
   return (
     <section>
       <h2 className="mb-2 text-base font-black uppercase text-mist sm:text-sm">{title}</h2>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {options.map(([option, label]) => (
-          <button key={option} onClick={() => onChange(option)} className={`min-h-14 rounded-lg border px-3 text-base font-black sm:min-h-12 sm:text-sm ${value === option ? "border-shock bg-shock/20 text-white" : "border-line bg-panel text-mist"}`}>
+          <button key={option} onClick={() => onChange(option)} className={`min-h-16 rounded-lg border px-4 text-base font-black transition sm:min-h-14 sm:text-sm ${value === option ? "border-shock bg-shock/25 text-white shadow-glow" : "border-line bg-panel text-mist hover:border-white/45"}`}>
             {label}
           </button>
         ))}
