@@ -470,7 +470,7 @@ export async function getRevealStats(matchId: string): Promise<RevealStats> {
   if (!playerAType || !playerBType) throw new Error("Player identities are missing.");
 
   const { data: votes, error: votesError } = await supabase
-    .from("votes")
+    .from("audience_votes")
     .select("voter_user_id, vote")
     .eq("match_id", matchId);
   if (votesError) throw votesError;

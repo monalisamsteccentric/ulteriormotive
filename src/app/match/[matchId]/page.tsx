@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AudienceStatsPanel } from "@/components/match/AudienceStatsPanel";
 import { MatchSharePanel } from "@/components/match/MatchSharePanel";
 import { RevealRequestPanel } from "@/components/match/RevealRequestPanel";
+import { WaitingTimer } from "@/components/match/WaitingTimer";
 import { VotePanel } from "@/components/voting/VotePanel";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { voteStats } from "@/lib/voteService";
@@ -44,6 +45,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
   const stats = safeMatch.id === "demo" ? { playerAIsAiPercent: 51, playerBIsAiPercent: 37, totalVotes: 94 } : await voteStats(matchId);
   const isWaiting = effectiveStatus === "waiting";
   const bothSeatsFilled = Boolean(safeMatch.player_a_user_id && safeMatch.player_b_user_id);
+  const isWaitingForSeat = isWaiting && !bothSeatsFilled;
   const statusLabel = isWaiting && bothSeatsFilled ? "Waiting for both players to enter" : isWaiting ? "Waiting for second player" : effectiveStatus.toUpperCase();
   const realMessages = messages?.filter((message) => !(hasPlayerMessages && message.sender_role === "system" && message.message.toLowerCase().includes("waiting for both players"))) ?? [];
   const safeMessages = ((realMessages.length ? realMessages : [
@@ -66,6 +68,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
 
   return (
     <AppShell>
+      <WaitingTimer matchId={safeMatch.id} waitUntil={safeMatch.wait_until} isWaitingForSeat={isWaitingForSeat} initialNow={Date.now()} />
       <section className="mb-3 rounded-lg border border-line bg-ink p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

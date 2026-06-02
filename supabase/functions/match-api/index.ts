@@ -348,6 +348,7 @@ async function requestReveal(supabase: any, input: any) {
   }
   const { error: revealError } = await supabase.from("matches").update({ status: "revealed", revealed_at: new Date().toISOString() }).eq("id", matchId);
   if (revealError) throw revealError;
+  await scoreRegularMatch(supabase, matchId);
   logTransition("revealed", matchId, { approvedBy: userId, requestedBy: match.reveal_requested_by_user_id });
   await broadcastMatchUpdate(supabase, matchId);
   return { status: "revealed" };
@@ -356,6 +357,18 @@ async function requestReveal(supabase: any, input: any) {
 async function vote(supabase: any, input: any) {
   validateVote(input.vote);
   if (!input.matchId || !input.voterUserId) throw new Error("Missing matchId or voterUserId.");
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("player_a_user_id, player_b_user_id, status")
+    .eq("id", input.matchId)
+    .single();
+  if (matchError) throw matchError;
+  if (match.status === "revealed" || match.status === "completed") throw new Error("Voting is closed for this match.");
+  if (input.voterUserId === match.player_a_user_id || input.voterUserId === match.player_b_user_id) {
+    throw new Error("Players cannot vote in their own match.");
+  }
+  await ensureVoterAllowed(supabase, String(input.voterUserId));
+
   const { error } = await supabase.from("votes").upsert(
     { match_id: input.matchId, voter_user_id: input.voterUserId, vote: input.vote },
     { onConflict: "match_id,voter_user_id" }
@@ -370,18 +383,12 @@ async function vote(supabase: any, input: any) {
 async function voteStatsResponse(supabase: any, input: any) {
   const matchId = String(input.matchId || "");
   if (!matchId) throw new Error("Missing matchId.");
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("player_a_user_id, player_b_user_id")
-    .eq("id", matchId)
-    .single();
-  if (matchError) throw matchError;
   const { data: votes, error: votesError } = await supabase
-    .from("votes")
+    .from("audience_votes")
     .select("voter_user_id, vote")
     .eq("match_id", matchId);
   if (votesError) throw votesError;
-  const stats = buildVoteStats(votes ?? [], match.player_a_user_id, match.player_b_user_id);
+  const stats = buildVoteStats(votes ?? [], null, null);
   if (input.voterUserId) {
     const { data: selected } = await supabase.from("votes").select("vote").eq("match_id", matchId).eq("voter_user_id", input.voterUserId).maybeSingle();
     return { ...stats, selectedVote: selected?.vote ?? null };
@@ -439,7 +446,7 @@ async function revealStats(supabase: any, input: any) {
   if (!playerAType || !playerBType) throw new Error("Player identities are missing.");
 
   const { data: votes, error: votesError } = await supabase
-    .from("votes")
+    .from("audience_votes")
     .select("voter_user_id, vote")
     .eq("match_id", matchId);
   if (votesError) throw votesError;
@@ -511,6 +518,7 @@ async function adminStart(supabase: any, input: any) {
 async function adminReveal(supabase: any, input: any) {
   const { error } = await supabase.from("matches").update({ status: "revealed", revealed_at: new Date().toISOString() }).eq("id", input.matchId);
   if (error) throw error;
+  await scoreRegularMatch(supabase, String(input.matchId || ""));
   logTransition("admin-reveal", input.matchId, {});
   await broadcastMatchUpdate(supabase, input.matchId);
   return { ok: true };
@@ -520,6 +528,135 @@ async function injectAiIntoOpenSeat(supabase: any, matchId: string) {
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error) throw error;
   return { ok: await fillEmptySeatWithAi(supabase, match, true) };
+}
+
+async function ensureVoterAllowed(supabase: any, voterUserId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("is_banned, deleted_at")
+    .eq("id", voterUserId)
+    .maybeSingle();
+  if (error && error.code !== "22P02") throw error;
+  if (data?.is_banned || data?.deleted_at) throw new Error("This account cannot vote.");
+}
+
+async function scoreRegularMatch(supabase: any, matchId: string) {
+  if (!matchId) return;
+  const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (error) throw error;
+  if (!match || match.championship_scored_at) return;
+  if (match.match_type && match.match_type !== "regular") return;
+  if (match.status !== "revealed" && match.status !== "completed") return;
+  if (!match.player_a_user_id || !match.player_b_user_id || !match.player_a_control_type || !match.player_b_control_type) return;
+
+  const { data: votes, error: votesError } = await supabase.from("audience_votes").select("voter_user_id, vote").eq("match_id", matchId);
+  if (votesError) throw votesError;
+
+  const audienceVotes = votes ?? [];
+  const playerADeceived = countDeceived(audienceVotes, "player_a", match.player_a_control_type);
+  const playerBDeceived = countDeceived(audienceVotes, "player_b", match.player_b_control_type);
+  const winner = playerADeceived > playerBDeceived ? "player_a" : playerBDeceived > playerADeceived ? "player_b" : "tie";
+  const period = {
+    month: match.championship_month ?? new Date(match.created_at).getMonth() + 1,
+    year: match.championship_year ?? new Date(match.created_at).getFullYear()
+  };
+
+  const results = [
+    buildChampionshipResult("player_a", match.player_a_user_id, playerADeceived, audienceVotes.length, winner),
+    buildChampionshipResult("player_b", match.player_b_user_id, playerBDeceived, audienceVotes.length, winner)
+  ];
+
+  for (const result of results) {
+    if (String(result.userId).startsWith("ai:")) continue;
+    await supabase.from("match_participants").upsert(
+      {
+        match_id: matchId,
+        user_id: result.userId,
+        player_role: result.role,
+        control_type: result.role === "player_a" ? match.player_a_control_type : match.player_b_control_type,
+        audience_deceived: result.audienceDeceived,
+        points_earned: result.points,
+        won_match: result.wonMatch,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "match_id,user_id" }
+    );
+    await addLeaderboardResult(supabase, period, result);
+  }
+
+  await recalculateLeaderboardRanks(supabase, period);
+  await supabase
+    .from("matches")
+    .update({ status: "completed", completed_at: new Date().toISOString(), championship_scored_at: new Date().toISOString() })
+    .eq("id", matchId)
+    .is("championship_scored_at", null);
+}
+
+function buildChampionshipResult(role: PlayerRole, userId: string, audienceDeceived: number, totalVotes: number, winner: PlayerRole | "tie") {
+  const wonMatch = winner === role;
+  const points = 10 + audienceDeceived + (wonMatch ? 50 : 0) + (totalVotes > 0 && audienceDeceived / totalVotes > 0.7 ? 25 : 0);
+  return { role, userId, audienceDeceived, wonMatch, points };
+}
+
+async function addLeaderboardResult(supabase: any, period: { month: number; year: number }, result: any) {
+  const { data: current, error } = await supabase
+    .from("monthly_leaderboard")
+    .select("*")
+    .eq("user_id", result.userId)
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .maybeSingle();
+  if (error) throw error;
+
+  const matchesPlayed = Number(current?.matches_played ?? 0) + 1;
+  const totalAudienceDeceived = Number(current?.total_audience_deceived ?? 0) + result.audienceDeceived;
+  const matchesWon = Number(current?.matches_won ?? 0) + (result.wonMatch ? 1 : 0);
+  const totalPoints = Number(current?.total_points ?? 0) + result.points;
+
+  const { error: upsertError } = await supabase.from("monthly_leaderboard").upsert(
+    {
+      user_id: result.userId,
+      month: period.month,
+      year: period.year,
+      matches_played: matchesPlayed,
+      matches_won: matchesWon,
+      total_audience_deceived: totalAudienceDeceived,
+      average_deception_per_match: Number((totalAudienceDeceived / matchesPlayed).toFixed(2)),
+      total_points: totalPoints,
+      qualification_status: current?.qualification_status === "disqualified" ? "disqualified" : "not_qualified",
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "user_id,month,year" }
+  );
+  if (upsertError) throw upsertError;
+}
+
+async function recalculateLeaderboardRanks(supabase: any, period: { month: number; year: number }) {
+  const { data, error } = await supabase
+    .from("monthly_leaderboard")
+    .select("*")
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .neq("qualification_status", "disqualified")
+    .order("total_points", { ascending: false })
+    .order("total_audience_deceived", { ascending: false })
+    .order("matches_won", { ascending: false });
+  if (error) throw error;
+
+  let rank = 1;
+  for (const entry of data ?? []) {
+    const qualificationStatus = rank <= 2 && !entry.frozen_at ? "qualified" : entry.qualification_status === "qualified" ? "not_qualified" : entry.qualification_status;
+    const { error: updateError } = await supabase
+      .from("monthly_leaderboard")
+      .update({ rank, qualification_status: qualificationStatus, updated_at: new Date().toISOString() })
+      .eq("id", entry.id);
+    if (updateError) throw updateError;
+    rank += 1;
+  }
+}
+
+function countDeceived(votes: { vote: VoteChoice }[], role: PlayerRole, actualType: ControlType) {
+  return votes.filter((row) => guessForRole(row.vote, role) !== actualType).length;
 }
 
 function buildVoteStats(votes: { voter_user_id: string; vote: VoteChoice }[], playerAUserId: string | null, playerBUserId: string | null) {
