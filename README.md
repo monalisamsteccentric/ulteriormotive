@@ -35,14 +35,15 @@ OPENAI_API_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=
+CHAMPIONSHIP_ADMIN_SECRET=
 RESEND_API_KEY=
 WAITING_MATCH_ALERT_EMAIL=monalisa.sahoo.jsr@gmail.com
 WAITING_MATCH_EMAIL_FROM=Ulterior Motive <onboarding@resend.dev>
 ```
 
-Set `SERVICE_ROLE_KEY` as a Supabase Edge Function secret, not in Amplify. Never expose `SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
+Set `SERVICE_ROLE_KEY` as a Supabase Edge Function secret only, not in the Next app host. Set the same `CHAMPIONSHIP_ADMIN_SECRET` value in the Next app host and in Supabase Edge Function secrets so logged-in admin routes can invoke protected function actions. Never expose `SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
 
-4. Run `supabase/schema.sql` in your Supabase SQL editor.
+4. Run `supabase/schema.sql` in your Supabase SQL editor. If the championship tables are missing, also run `supabase/setup_championship.sql`.
 
 5. Start the app:
 

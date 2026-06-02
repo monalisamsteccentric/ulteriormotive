@@ -45,11 +45,29 @@ Deno.serve(async (req) => {
       case "waiting-matches":
         return json(req, await processWaitingMatches(supabase));
       case "admin-start":
+        requireAdminSecret(body);
         return json(req, await adminStart(supabase, body));
       case "admin-reveal":
+        requireAdminSecret(body);
         return json(req, await adminReveal(supabase, body));
       case "admin-inject-ai":
+        requireAdminSecret(body);
         return json(req, await injectAiIntoOpenSeat(supabase, String(body.matchId || "")));
+      case "admin-championship-freeze":
+        requireAdminSecret(body);
+        return json(req, await freezeLeaderboard(supabase, periodFromInput(body.period)));
+      case "admin-championship-schedule-final":
+        requireAdminSecret(body);
+        return json(req, await createOrScheduleFinalMatch(supabase, periodFromInput(body.period)));
+      case "admin-championship-finalize":
+        requireAdminSecret(body);
+        return json(req, await finalizeMonthlyChampion(supabase, body));
+      case "admin-championship-disqualify":
+        requireAdminSecret(body);
+        return json(req, await disqualifyUser(supabase, String(body.userId || ""), periodFromInput(body.period)));
+      case "admin-championship-prize":
+        requireAdminSecret(body);
+        return json(req, await updatePrizeStatus(supabase, body));
       default:
         throw new Error("Unknown match-api action.");
     }
@@ -67,6 +85,21 @@ function adminClient() {
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
+}
+
+function requireAdminSecret(input: any) {
+  const expected = Deno.env.get("CHAMPIONSHIP_ADMIN_SECRET") || Deno.env.get("CRON_SECRET");
+  if (!expected) throw new Error("Admin function secret missing: CHAMPIONSHIP_ADMIN_SECRET or CRON_SECRET.");
+  if (String(input?.adminSecret || "") !== expected) throw new Error("Admin function access denied.");
+}
+
+function periodFromInput(input: any) {
+  const now = new Date();
+  const month = Number(input?.month ?? now.getMonth() + 1);
+  const year = Number(input?.year ?? now.getFullYear());
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("Invalid championship month.");
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("Invalid championship year.");
+  return { month, year };
 }
 
 async function joinMatch(supabase: any, input: any) {
@@ -528,6 +561,201 @@ async function injectAiIntoOpenSeat(supabase: any, matchId: string) {
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error) throw error;
   return { ok: await fillEmptySeatWithAi(supabase, match, true) };
+}
+
+async function freezeLeaderboard(supabase: any, period: { month: number; year: number }) {
+  await recalculateLeaderboardRanks(supabase, period);
+  const leaderboard = await leaderboardForPeriod(supabase, period);
+  const finalists = leaderboard.filter((entry: any) => entry.qualification_status !== "disqualified").slice(0, 2);
+  if (finalists.length < 2) throw new Error("At least two ranked players are required to freeze the monthly finalists.");
+
+  const frozenAt = new Date().toISOString();
+  const { error: resetError } = await supabase
+    .from("monthly_leaderboard")
+    .update({ frozen_at: frozenAt, qualification_status: "not_qualified", updated_at: frozenAt })
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .neq("qualification_status", "disqualified");
+  if (resetError) throw resetError;
+
+  const { error: finalistError } = await supabase
+    .from("monthly_leaderboard")
+    .update({ frozen_at: frozenAt, qualification_status: "finalist", updated_at: frozenAt })
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .in("user_id", finalists.map((entry: any) => entry.user_id));
+  if (finalistError) throw finalistError;
+
+  const { data, error } = await supabase
+    .from("monthly_finals")
+    .upsert(
+      {
+        month: period.month,
+        year: period.year,
+        finalist_one_user_id: finalists[0].user_id,
+        finalist_two_user_id: finalists[1].user_id,
+        status: "scheduled",
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "month,year" }
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function createOrScheduleFinalMatch(supabase: any, period: { month: number; year: number }) {
+  let final = await currentFinal(supabase, period);
+  if (!final) final = await freezeLeaderboard(supabase, period);
+  if (final.final_match_id) return final;
+
+  const inviteCode = Math.random().toString(36).replace(/[^a-z0-9]/gi, "").slice(2, 8).toUpperCase();
+  const waitUntil = new Date(Date.now() + 60 * 60_000).toISOString();
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .insert({
+      invite_code: inviteCode,
+      wait_until: waitUntil,
+      status: "waiting",
+      match_type: "monthly_final",
+      championship_month: period.month,
+      championship_year: period.year
+    })
+    .select("id")
+    .single();
+  if (matchError) throw matchError;
+
+  const { data, error } = await supabase
+    .from("monthly_finals")
+    .update({ final_match_id: match.id, status: "scheduled", updated_at: new Date().toISOString() })
+    .eq("id", final.id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function finalizeMonthlyChampion(supabase: any, input: any) {
+  const period = periodFromInput(input.period);
+  const final = await currentFinal(supabase, period);
+  if (!final) throw new Error("No monthly final is scheduled.");
+  if (!final.final_match_id && !input.championUserId) throw new Error("Schedule a final match or choose a manual champion.");
+
+  let championUserId = cleanOptionalString(input.championUserId);
+  let runnerUpUserId = cleanOptionalString(input.runnerUpUserId);
+
+  if (!championUserId && final.final_match_id) {
+    const results = await calculateFinalResults(supabase, String(final.final_match_id));
+    const winner = results.find((result: any) => result.wonMatch);
+    if (!winner) throw new Error("Final match is tied. Use manual finalize to choose the champion.");
+    championUserId = winner.userId;
+    runnerUpUserId = results.find((result: any) => result.userId !== winner.userId)?.userId;
+  }
+
+  if (!championUserId) throw new Error("Champion is required.");
+  runnerUpUserId ??= championUserId === final.finalist_one_user_id ? final.finalist_two_user_id : final.finalist_one_user_id;
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("monthly_champions")
+    .upsert(
+      {
+        month: period.month,
+        year: period.year,
+        champion_user_id: championUserId,
+        runner_up_user_id: runnerUpUserId,
+        final_match_id: final.final_match_id,
+        prize_amount: 5000,
+        prize_status: "unpaid",
+        admin_note: cleanOptionalString(input.adminNote) ?? null,
+        finalized_at: now,
+        updated_at: now
+      },
+      { onConflict: "month,year" }
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  await supabase.from("monthly_finals").update({ status: "completed", updated_at: now }).eq("id", final.id);
+  await supabase.from("monthly_leaderboard").update({ qualification_status: "champion", updated_at: now }).eq("month", period.month).eq("year", period.year).eq("user_id", championUserId);
+  await supabase.from("monthly_leaderboard").update({ qualification_status: "runner_up", updated_at: now }).eq("month", period.month).eq("year", period.year).eq("user_id", runnerUpUserId);
+  return data;
+}
+
+async function disqualifyUser(supabase: any, userId: string, period: { month: number; year: number }) {
+  if (!userId) throw new Error("Missing userId.");
+  await supabase.from("profiles").update({ is_banned: true }).eq("id", userId);
+  const { error } = await supabase
+    .from("monthly_leaderboard")
+    .update({ qualification_status: "disqualified", updated_at: new Date().toISOString() })
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .eq("user_id", userId);
+  if (error) throw error;
+  await recalculateLeaderboardRanks(supabase, period);
+  return { ok: true };
+}
+
+async function updatePrizeStatus(supabase: any, input: any) {
+  const period = periodFromInput(input.period);
+  const prizeStatus = String(input.prizeStatus || "");
+  if (prizeStatus !== "paid" && prizeStatus !== "unpaid") throw new Error("Invalid prize status.");
+  const { error } = await supabase
+    .from("monthly_champions")
+    .update({ prize_status: prizeStatus, admin_note: cleanOptionalString(input.adminNote) ?? null, updated_at: new Date().toISOString() })
+    .eq("month", period.month)
+    .eq("year", period.year);
+  if (error) throw error;
+  return { ok: true };
+}
+
+async function currentFinal(supabase: any, period: { month: number; year: number }) {
+  const { data, error } = await supabase
+    .from("monthly_finals")
+    .select("*")
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function leaderboardForPeriod(supabase: any, period: { month: number; year: number }) {
+  const { data, error } = await supabase
+    .from("monthly_leaderboard")
+    .select("*")
+    .eq("month", period.month)
+    .eq("year", period.year)
+    .order("rank", { ascending: true, nullsFirst: false })
+    .order("total_points", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function calculateFinalResults(supabase: any, matchId: string) {
+  const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (error) throw error;
+  if (!match.player_a_user_id || !match.player_b_user_id || !match.player_a_control_type || !match.player_b_control_type) {
+    throw new Error("Match participants or identities are missing.");
+  }
+
+  const { data: votes, error: votesError } = await supabase.from("audience_votes").select("voter_user_id, vote").eq("match_id", matchId);
+  if (votesError) throw votesError;
+  const audienceVotes = votes ?? [];
+  const playerADeceived = countDeceived(audienceVotes, "player_a", match.player_a_control_type);
+  const playerBDeceived = countDeceived(audienceVotes, "player_b", match.player_b_control_type);
+  const winner = playerADeceived > playerBDeceived ? "player_a" : playerBDeceived > playerADeceived ? "player_b" : "tie";
+  return [
+    buildChampionshipResult("player_a", match.player_a_user_id, playerADeceived, audienceVotes.length, winner),
+    buildChampionshipResult("player_b", match.player_b_user_id, playerBDeceived, audienceVotes.length, winner)
+  ];
+}
+
+function cleanOptionalString(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text || undefined;
 }
 
 async function ensureVoterAllowed(supabase: any, voterUserId: string) {

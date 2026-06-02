@@ -15,6 +15,7 @@ Use this before every production deploy.
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `NEXT_PUBLIC_APP_URL`
 - Amplify must not require `SUPABASE_SERVICE_ROLE_KEY`.
+- Amplify may use `CHAMPIONSHIP_ADMIN_SECRET` for protected admin Edge Function calls; this is not a Supabase service-role key.
 
 ## Supabase Edge Functions
 
@@ -24,6 +25,7 @@ Use this before every production deploy.
 - Edge Function secrets:
   - `SUPABASE_URL`
   - `SERVICE_ROLE_KEY`
+  - `CHAMPIONSHIP_ADMIN_SECRET` or `CRON_SECRET`
   - `OPENAI_API_KEY` if AI replies are enabled
 - Deploy command:
   - `npx supabase functions deploy create-match`

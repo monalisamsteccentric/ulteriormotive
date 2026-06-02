@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createOrScheduleFinalMatch,
-  currentPeriod,
-  disqualifyUser,
-  finalizeMonthlyChampion,
-  freezeLeaderboard,
-  updatePrizeStatus
-} from "@/lib/championship";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin } from "@/lib/admin";
+import { currentPeriod } from "@/lib/championship";
+import { callAdminMatchEdgeFunctionJson } from "@/lib/edgeProxy";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +15,10 @@ export async function POST(request: NextRequest) {
       year: Number(form.get("year") || currentPeriod().year)
     };
 
-    if (action === "freeze") await freezeLeaderboard(period);
-    else if (action === "schedule_final") await createOrScheduleFinalMatch(period);
+    if (action === "freeze") await callAdminMatchEdgeFunctionJson("admin-championship-freeze", { period });
+    else if (action === "schedule_final") await callAdminMatchEdgeFunctionJson("admin-championship-schedule-final", { period });
     else if (action === "finalize") {
-      await finalizeMonthlyChampion({
+      await callAdminMatchEdgeFunctionJson("admin-championship-finalize", {
         period,
         championUserId: cleanOptional(form.get("championUserId")),
         runnerUpUserId: cleanOptional(form.get("runnerUpUserId")),
@@ -33,11 +27,11 @@ export async function POST(request: NextRequest) {
     } else if (action === "disqualify") {
       const userId = cleanOptional(form.get("userId"));
       if (!userId) throw new Error("Missing userId.");
-      await disqualifyUser(userId, period);
+      await callAdminMatchEdgeFunctionJson("admin-championship-disqualify", { period, userId });
     } else if (action === "prize") {
       const prizeStatus = String(form.get("prizeStatus"));
       if (prizeStatus !== "paid" && prizeStatus !== "unpaid") throw new Error("Invalid prize status.");
-      await updatePrizeStatus({ period, prizeStatus, adminNote: cleanOptional(form.get("adminNote")) });
+      await callAdminMatchEdgeFunctionJson("admin-championship-prize", { period, prizeStatus, adminNote: cleanOptional(form.get("adminNote")) });
     } else {
       throw new Error("Unknown championship action.");
     }
@@ -46,16 +40,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
-}
-
-async function requireAdmin() {
-  const supabase = await supabaseServer();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error("Login required.");
-
-  const { data: profile, error } = await supabase.from("profiles").select("is_admin").eq("id", userData.user.id).single();
-  if (error) throw error;
-  if (!profile?.is_admin) throw new Error("Admin access required.");
 }
 
 function cleanOptional(value: FormDataEntryValue | null) {

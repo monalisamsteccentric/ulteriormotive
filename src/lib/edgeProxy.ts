@@ -4,6 +4,10 @@ export async function callMatchEdgeFunction(action: string, payload: Record<stri
   return callEdgeFunction("match-api", { action, ...payload });
 }
 
+export async function callAdminMatchEdgeFunction(action: string, payload: Record<string, unknown> = {}) {
+  return callEdgeFunction("match-api", withAdminSecret({ action, ...payload }));
+}
+
 export async function callEdgeFunction(functionName: string, payload: Record<string, unknown> = {}) {
   const { response, result } = await invokeEdgeFunction(functionName, payload);
 
@@ -25,6 +29,10 @@ export async function callEdgeFunction(functionName: string, payload: Record<str
 
 export async function callMatchEdgeFunctionJson<T>(action: string, payload: Record<string, unknown> = {}) {
   return callEdgeFunctionJson<T>("match-api", { action, ...payload });
+}
+
+export async function callAdminMatchEdgeFunctionJson<T>(action: string, payload: Record<string, unknown> = {}) {
+  return callEdgeFunctionJson<T>("match-api", withAdminSecret({ action, ...payload }));
 }
 
 export async function callEdgeFunctionJson<T>(functionName: string, payload: Record<string, unknown> = {}) {
@@ -65,4 +73,10 @@ async function invokeEdgeFunction(functionName: string, payload: Record<string, 
   });
   const result = await response.json().catch(() => null);
   return { response, result };
+}
+
+function withAdminSecret(payload: Record<string, unknown>) {
+  const adminSecret = process.env.CHAMPIONSHIP_ADMIN_SECRET || process.env.CRON_SECRET;
+  if (!adminSecret) throw new Error("Admin Edge Function secret missing: CHAMPIONSHIP_ADMIN_SECRET or CRON_SECRET");
+  return { ...payload, adminSecret };
 }
