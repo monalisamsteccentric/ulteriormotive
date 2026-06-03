@@ -202,8 +202,8 @@ export function RealtimeChat({
   }
 
   return (
-    <section className="flex min-h-[62dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink shadow-glow sm:min-h-[68dvh]">
-      <div className="border-b border-line bg-void/70 px-4 py-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+    <section className="chat-console flex min-h-[62dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink shadow-glow sm:min-h-[68dvh] xl:min-h-[560px]">
+      <div className="relative border-b border-line bg-void/70 px-4 py-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-black uppercase text-neon sm:text-xs">Conversation feed</p>
@@ -222,7 +222,7 @@ export function RealtimeChat({
         </p>
         {entryError ? <p className="mt-2 text-sm font-black text-shock sm:text-xs">{entryError}</p> : null}
       </div>
-      <div ref={chatScrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-3 sm:p-3 lg:space-y-5 lg:p-5">
+      <div ref={chatScrollRef} className="relative flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-3 sm:p-3 lg:space-y-5 lg:p-5">
         {messages.map((message) => (
           <ChatBubble key={message.id} message={message} />
         ))}

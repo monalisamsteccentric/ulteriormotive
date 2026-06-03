@@ -92,19 +92,42 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
           <MatchSeat label="Player B" filled={Boolean(safeMatch.player_b_user_id)} entered={Boolean(safeMatch.player_b_entered_at)} />
         </div>
       </section>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
-        <RealtimeChat
-          matchId={safeMatch.id}
-          initialMessages={safeMessages}
-          userId={null}
-          playerAUserId={safeMatch.player_a_user_id}
-          playerBUserId={safeMatch.player_b_user_id}
-          status={effectiveStatus}
-          playerAIsAi={safeMatch.player_a_revealed_type === "ai"}
-          playerBIsAi={safeMatch.player_b_revealed_type === "ai"}
-        />
-        <div className="space-y-3">
-          <HowToWinPanel />
+      <section className="match-arena mb-5">
+        <div className="match-arena__beam match-arena__beam--left" />
+        <div className="match-arena__beam match-arena__beam--right" />
+        <div className="relative grid gap-4 xl:grid-cols-[minmax(13rem,0.72fr)_minmax(0,1.35fr)_minmax(13rem,0.72fr)] xl:items-center">
+          <div className="order-2 xl:order-none">
+            <PlayerHoloCard
+              side="left"
+              label="Player A"
+              name={playerAName}
+              filled={Boolean(safeMatch.player_a_user_id)}
+              entered={Boolean(safeMatch.player_a_entered_at)}
+            />
+          </div>
+          <div className="order-1 xl:order-none">
+            <RealtimeChat
+              matchId={safeMatch.id}
+              initialMessages={safeMessages}
+              userId={null}
+              playerAUserId={safeMatch.player_a_user_id}
+              playerBUserId={safeMatch.player_b_user_id}
+              status={effectiveStatus}
+              playerAIsAi={safeMatch.player_a_revealed_type === "ai"}
+              playerBIsAi={safeMatch.player_b_revealed_type === "ai"}
+            />
+          </div>
+          <div className="order-3 xl:order-none">
+            <PlayerHoloCard
+              side="right"
+              label="Player B"
+              name={playerBName}
+              filled={Boolean(safeMatch.player_b_user_id)}
+              entered={Boolean(safeMatch.player_b_entered_at)}
+            />
+          </div>
+        </div>
+        <div className="relative mt-4">
           <VotePanel
             matchId={safeMatch.id}
             userId={null}
@@ -112,25 +135,28 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
             playerBUserId={safeMatch.player_b_user_id}
             initialStats={stats}
           />
-          <AudienceStatsPanel matchId={safeMatch.id} />
-          <MatchSharePanel
-            matchId={safeMatch.id}
-            playerAUserId={safeMatch.player_a_user_id}
-            playerBUserId={safeMatch.player_b_user_id}
-            playerAName={playerAName}
-            playerBName={playerBName}
-          />
-          <RevealRequestPanel
-            matchId={safeMatch.id}
-            status={effectiveStatus}
-            startedAt={safeMatch.started_at}
-            playerAUserId={safeMatch.player_a_user_id}
-            playerBUserId={safeMatch.player_b_user_id}
-            revealRequestedByUserId={safeMatch.reveal_requested_by_user_id}
-            revealRequestedAt={safeMatch.reveal_requested_at}
-            initialNow={Date.now()}
-          />
         </div>
+      </section>
+      <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+        <HowToWinPanel />
+        <AudienceStatsPanel matchId={safeMatch.id} />
+        <MatchSharePanel
+          matchId={safeMatch.id}
+          playerAUserId={safeMatch.player_a_user_id}
+          playerBUserId={safeMatch.player_b_user_id}
+          playerAName={playerAName}
+          playerBName={playerBName}
+        />
+        <RevealRequestPanel
+          matchId={safeMatch.id}
+          status={effectiveStatus}
+          startedAt={safeMatch.started_at}
+          playerAUserId={safeMatch.player_a_user_id}
+          playerBUserId={safeMatch.player_b_user_id}
+          revealRequestedByUserId={safeMatch.reveal_requested_by_user_id}
+          revealRequestedAt={safeMatch.reveal_requested_at}
+          initialNow={Date.now()}
+        />
       </div>
     </AppShell>
   );
@@ -149,6 +175,42 @@ function MatchSeat({ label, filled, entered }: { label: string; filled: boolean;
         {entered ? "Ready to deceive or detect." : filled ? "Waiting to enter the chat." : "One seat remains."}
       </p>
     </div>
+  );
+}
+
+function PlayerHoloCard({
+  side,
+  label,
+  name,
+  filled,
+  entered
+}: {
+  side: "left" | "right";
+  label: string;
+  name: string;
+  filled: boolean;
+  entered: boolean;
+}) {
+  return (
+    <article className={`holo-player holo-player--${side}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase text-white/70">{label}</p>
+          <h2 className="mt-1 truncate text-2xl font-black text-white">{name}</h2>
+        </div>
+        <span className="holo-status-dot" />
+      </div>
+      <div className={`holo-silhouette holo-silhouette--${side}`} aria-hidden="true" />
+      <div className="holo-wave" aria-hidden="true">
+        {Array.from({ length: 32 }).map((_, index) => (
+          <span key={index} style={{ height: `${12 + ((index * 17) % 38)}%` }} />
+        ))}
+      </div>
+      <div className="mt-auto flex items-center justify-between gap-3 text-xs font-black uppercase text-white/72">
+        <span>{entered ? "In chatroom" : filled ? "Seat claimed" : "Open seat"}</span>
+        <span>{side === "left" ? "63%" : "37%"}</span>
+      </div>
+    </article>
   );
 }
 

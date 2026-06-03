@@ -7,10 +7,10 @@ import { Button } from "@/components/common/Button";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 const options: { label: string; vote: VoteChoice }[] = [
-  { label: "Player A is AI + Player B is AI", vote: "both_ai" },
-  { label: "Player A is Human + Player B is Human", vote: "none_ai" },
-  { label: "Player A is Human + Player B is AI", vote: "player_b_ai" },
-  { label: "Player A is AI + Player B is Human", vote: "player_a_ai" }
+  { label: "Both AI?", vote: "both_ai" },
+  { label: "Both human?", vote: "none_ai" },
+  { label: "Player B AI?", vote: "player_b_ai" },
+  { label: "Player A AI?", vote: "player_a_ai" }
 ];
 
 type VotePanelProps = {
@@ -125,7 +125,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
     : "Decide who is human, who is AI, and who is bluffing.";
 
   return (
-    <section className="rounded-lg border border-line bg-ink p-4">
+    <section className="vote-console rounded-lg border border-line bg-ink p-4">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase text-neon">Audience suspicion</p>
@@ -135,23 +135,23 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
         <span className="w-fit rounded-lg border border-line bg-panel px-2 py-1 text-sm font-black uppercase text-mist sm:text-xs">{stats.totalVotes} votes cast</span>
       </div>
       {playerGuessOptions ? (
-        <div className="mb-4 grid gap-2">
+        <div className="mb-4 grid gap-2 sm:grid-cols-2">
           {playerGuessOptions.map((option) => (
-            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="w-full" onClick={() => submit(option.vote)}>
+            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="vote-console__choice w-full" onClick={() => submit(option.vote)}>
               {selected === option.vote ? "Saved: " : ""}{option.label}
             </Button>
           ))}
         </div>
       ) : (
-        <div className="mb-4 grid gap-2">
+        <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {options.map((option) => (
-            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="w-full" onClick={() => submit(option.vote)}>
+            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="vote-console__choice w-full" onClick={() => submit(option.vote)}>
               {selected === option.vote ? "Voted: " : ""}{option.label}
             </Button>
           ))}
         </div>
       )}
-      <div className="mb-4 grid gap-3 text-base font-bold sm:gap-2 sm:text-sm">
+      <div className="mb-4 grid gap-3 text-base font-bold sm:grid-cols-2 sm:gap-3 sm:text-sm">
         <Meter label="Player A is AI" value={stats.playerAIsAiPercent} />
         <Meter label="Player B is AI" value={stats.playerBIsAiPercent} />
       </div>
@@ -161,13 +161,19 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
 }
 
 function Meter({ label, value }: { label: string; value: number }) {
+  const inverseValue = Math.max(0, 100 - value);
+
   return (
-    <div>
+    <div className="vote-console__meter rounded-lg border border-line bg-panel/70 p-3">
       <div className="mb-2 flex justify-between text-mist sm:mb-1">
         <span>{label}</span>
         <span>{value}%</span>
       </div>
-      <div className="h-3 rounded-full bg-panel sm:h-2">
+      <div className="mb-1 flex justify-between text-lg font-black leading-none">
+        <span className="text-shock">{value}%</span>
+        <span className="text-violet">{inverseValue}%</span>
+      </div>
+      <div className="h-3 overflow-hidden rounded-full bg-violet/40 sm:h-2">
         <div className="h-3 rounded-full bg-neon sm:h-2" style={{ width: `${value}%` }} />
       </div>
     </div>
