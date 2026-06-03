@@ -69,11 +69,11 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
   return (
     <AppShell>
       <WaitingTimer matchId={safeMatch.id} waitUntil={safeMatch.wait_until} isWaitingForSeat={isWaitingForSeat} initialNow={Date.now()} />
-      <section className="mb-6 rounded-lg border border-neon/50 bg-ink/95 p-5 shadow-glow">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+      <section className="mb-5 rounded-lg border border-neon/50 bg-ink/95 p-4 shadow-glow sm:mb-6 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <p className="text-sm font-black uppercase text-neon sm:text-xs">Live match room</p>
-            <p className={`mt-2 text-4xl font-black leading-tight sm:text-5xl ${isWaiting ? "text-white" : "text-shock"}`}>
+            <p className={`mt-2 break-words text-4xl font-black leading-tight sm:text-5xl ${isWaiting ? "text-white" : "text-shock"}`}>
               {statusLabel}
             </p>
             <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-mist">
@@ -82,7 +82,7 @@ export default async function MatchPage({ params }: { params: Promise<{ matchId:
                 : "Watch the conversation closely. Every pause, bluff, and contradiction matters."}
             </p>
           </div>
-          <div className="text-left sm:text-right">
+          <div className="rounded-lg border border-line bg-panel/70 p-3 text-left sm:border-0 sm:bg-transparent sm:p-0 sm:text-right">
             <p className="text-sm font-black uppercase text-mist sm:text-xs">Invite code</p>
             <p className="mt-1 text-xl font-black text-white">{safeMatch.invite_code}</p>
           </div>

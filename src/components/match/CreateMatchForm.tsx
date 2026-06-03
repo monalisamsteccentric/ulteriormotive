@@ -80,7 +80,7 @@ function Choice({ title, options, value, onChange }: { title: string; options: [
   return (
     <section>
       <h2 className="mb-2 text-base font-black uppercase text-mist sm:text-sm">{title}</h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {options.map(([option, label]) => (
           <button key={option} onClick={() => onChange(option)} className={`min-h-16 rounded-lg border px-4 text-base font-black transition sm:min-h-14 sm:text-sm ${value === option ? "border-shock bg-shock/25 text-white shadow-glow" : "border-line bg-panel text-mist hover:border-white/45"}`}>
             {label}

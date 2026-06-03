@@ -11,7 +11,7 @@ export function ChatBubble({ message }: { message: Message }) {
       <span className="text-sm font-black uppercase text-mist sm:text-xs">{label}</span>
       <div
         className={cn(
-          "rounded-lg border border-line bg-panel px-5 py-4 text-lg font-semibold leading-8 text-white sm:px-3 sm:py-2 sm:text-sm sm:leading-6",
+          "break-words rounded-lg border border-line bg-panel px-3 py-3 text-base font-semibold leading-7 text-white sm:px-3 sm:py-2 sm:text-sm sm:leading-6 lg:px-5 lg:py-4 lg:text-lg lg:leading-8",
           isA && "border-neon/70",
           isB && "border-shock/70",
           message.sender_role === "system" && "border-violet/70 bg-violet/10 text-mist"

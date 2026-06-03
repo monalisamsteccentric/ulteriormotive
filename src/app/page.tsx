@@ -41,11 +41,11 @@ export default function HomePage() {
         </p>
 
         <div className="mt-7 flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:justify-center">
-          <LinkButton href="/matches" className="gap-3 text-lg sm:min-w-56">
+          <LinkButton href="/matches" className="w-full gap-3 text-lg sm:min-w-56 sm:w-auto">
             <Eye size={21} />
             Watch Live Match
           </LinkButton>
-          <LinkButton href="/join" variant="ghost" className="gap-3 text-lg sm:min-w-52">
+          <LinkButton href="/join" variant="ghost" className="w-full gap-3 text-lg sm:min-w-52 sm:w-auto">
             <Play size={21} className="text-neon" />
             Join Next Match
           </LinkButton>
@@ -74,7 +74,7 @@ export default function HomePage() {
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-void via-void/10 to-transparent" />
-          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/20 bg-void/76 px-4 py-3 backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5">
+          <div className="absolute bottom-3 left-3 right-3 flex flex-col gap-3 rounded-lg border border-white/20 bg-void/76 px-4 py-3 backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-left">
               <p className="text-xs font-black uppercase text-neon">Reveal pending</p>
               <p className="mt-1 text-sm font-bold text-white sm:text-base">Every message is evidence.</p>

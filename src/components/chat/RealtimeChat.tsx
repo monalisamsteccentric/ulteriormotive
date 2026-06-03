@@ -202,16 +202,16 @@ export function RealtimeChat({
   }
 
   return (
-    <section className="flex min-h-[68dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink shadow-glow">
-      <div className="border-b border-line bg-void/70 px-5 py-5 sm:px-4 sm:py-4">
+    <section className="flex min-h-[62dvh] flex-1 flex-col overflow-hidden rounded-lg border border-line bg-ink shadow-glow sm:min-h-[68dvh]">
+      <div className="border-b border-line bg-void/70 px-4 py-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-black uppercase text-neon sm:text-xs">Conversation feed</p>
-            <h2 className="mt-1 text-3xl font-black leading-tight text-white sm:text-2xl">Read every hesitation.</h2>
+            <h2 className="mt-1 text-2xl font-black leading-tight text-white sm:text-2xl lg:text-3xl">Read every hesitation.</h2>
           </div>
           <span className="rounded-lg border border-line bg-panel px-3 py-2 text-xs font-black uppercase text-mist">You are {roleLabel(role)}</span>
         </div>
-        <p className="mt-3 text-lg font-bold leading-8 text-mist sm:text-sm sm:leading-6">
+        <p className="mt-3 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6 lg:text-lg lg:leading-8">
           {role === "audience"
             ? playerAIsAi && playerBIsAi
               ? "Both seats are AI-controlled. Watch the bots talk, vote, and reveal when ready."
@@ -222,18 +222,18 @@ export function RealtimeChat({
         </p>
         {entryError ? <p className="mt-2 text-sm font-black text-shock sm:text-xs">{entryError}</p> : null}
       </div>
-      <div ref={chatScrollRef} className="flex-1 space-y-5 overflow-y-auto p-5 sm:space-y-3 sm:p-3">
+      <div ref={chatScrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-3 sm:p-3 lg:space-y-5 lg:p-5">
         {messages.map((message) => (
           <ChatBubble key={message.id} message={message} />
         ))}
         <div ref={bottomRef} />
       </div>
       {role === "audience" ? (
-        <div className="border-t border-line bg-void/95 p-4 text-lg font-bold leading-8 text-mist sm:p-3 sm:text-sm sm:leading-normal">
+        <div className="border-t border-line bg-void/95 p-3 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-normal lg:p-4 lg:text-lg lg:leading-8">
           Audience mode: watch the players and vote from the Prediction Board.
         </div>
       ) : (
-        <form onSubmit={send} className="sticky bottom-0 flex gap-2 border-t border-line bg-void/95 p-4 sm:p-3">
+        <form onSubmit={send} className="sticky bottom-0 flex gap-2 border-t border-line bg-void/95 p-3 lg:p-4">
           <input
             value={draft}
             maxLength={280}

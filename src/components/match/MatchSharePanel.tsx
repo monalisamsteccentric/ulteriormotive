@@ -78,7 +78,7 @@ export function MatchSharePanel({
           className="mt-2 min-h-28 w-full resize-none rounded-lg border border-line bg-panel px-3 py-3 text-sm font-bold leading-6 text-white outline-none focus:border-neon"
         />
       </label>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <a
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 text-sm font-black text-white"
           href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}

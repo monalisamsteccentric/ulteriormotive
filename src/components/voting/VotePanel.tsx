@@ -126,18 +126,18 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
 
   return (
     <section className="rounded-lg border border-line bg-ink p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-black uppercase text-neon">Audience suspicion</p>
           <h2 className="mt-1 text-2xl font-black sm:text-xl">{title}</h2>
           <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-normal">{subtitle}</p>
         </div>
-        <span className="rounded-lg border border-line bg-panel px-2 py-1 text-sm font-black uppercase text-mist sm:text-xs">{stats.totalVotes} votes cast</span>
+        <span className="w-fit rounded-lg border border-line bg-panel px-2 py-1 text-sm font-black uppercase text-mist sm:text-xs">{stats.totalVotes} votes cast</span>
       </div>
       {playerGuessOptions ? (
         <div className="mb-4 grid gap-2">
           {playerGuessOptions.map((option) => (
-            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} onClick={() => submit(option.vote)}>
+            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="w-full" onClick={() => submit(option.vote)}>
               {selected === option.vote ? "Saved: " : ""}{option.label}
             </Button>
           ))}
@@ -145,7 +145,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
       ) : (
         <div className="mb-4 grid gap-2">
           {options.map((option) => (
-            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} onClick={() => submit(option.vote)}>
+            <Button key={option.vote} type="button" variant={selected === option.vote ? "primary" : "ghost"} className="w-full" onClick={() => submit(option.vote)}>
               {selected === option.vote ? "Voted: " : ""}{option.label}
             </Button>
           ))}
