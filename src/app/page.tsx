@@ -64,14 +64,14 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto mt-8 w-full max-w-6xl overflow-hidden rounded-lg border border-line bg-ink shadow-glow">
-        <div className="home-hero-image relative min-h-[420px] sm:aspect-[16/9] sm:min-h-[360px]">
+        <div className="home-hero-image relative aspect-[1672/941] sm:aspect-[16/9] sm:min-h-[360px]">
           <Image
             src="/hero.png"
             alt="Two hidden players face off while the audience votes on who is human, AI, lying, or trustworthy."
             fill
             priority
             sizes="(max-width: 768px) 100vw, 1120px"
-            className="object-cover"
+            className="object-contain sm:object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-void via-void/20 to-transparent sm:via-void/10" />
           <div className="absolute bottom-3 left-3 right-3 flex flex-col gap-3 rounded-lg border border-white/20 bg-void/76 px-4 py-3 backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5 sm:flex-row sm:items-center sm:justify-between">

@@ -601,12 +601,8 @@ a {
     border-radius: 34px;
   }
 
-  .home-hero-image {
-    min-height: clamp(390px, 112vw, 520px);
-  }
-
   .home-hero-image img {
-    object-position: center top;
+    object-position: center center;
   }
 
   .phone-frame-mid {
