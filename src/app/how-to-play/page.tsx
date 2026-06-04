@@ -7,7 +7,9 @@ const matchSteps = [
   "The players chat.",
   "The audience watches.",
   "The audience votes.",
-  "Players earn points based on how many people they successfully deceive.",
+  "Before revealing, a player must guess whether the other player is Human or AI.",
+  "When a player presses Reveal Truth, identities unlock immediately.",
+  "Correct reveal guess gives +30. Wrong reveal gives -30 to the revealer and +30 to the other player.",
   "Top players qualify for championship matches."
 ];
 
@@ -41,6 +43,15 @@ export default function HowToPlayPage() {
               ))}
             </ol>
           </article>
+        </section>
+
+        <section className="rounded-lg border border-neon/45 bg-neon/10 p-5">
+          <h2 className="text-2xl font-black text-white">Reveal Rule</h2>
+          <div className="mt-3 space-y-3 text-base font-bold leading-7 text-mist">
+            <p>Reveal Truth is available only after the player pressing it has guessed whether the other player is Human or AI.</p>
+            <p>Reveal happens immediately. There is no approval wait from the other player.</p>
+            <p className="text-white">If the revealer guesses wrong, they lose 30 points and the other player gains 30 points.</p>
+          </div>
         </section>
 
         <section className="rounded-lg border border-shock/50 bg-shock/10 p-5">
