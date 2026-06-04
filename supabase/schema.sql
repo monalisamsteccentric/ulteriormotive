@@ -73,6 +73,29 @@ create table audience_viewers (
   unique(match_id, viewer_user_id)
 );
 
+create table beta_feedback (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  user_type text,
+  issue text,
+  feedback text,
+  rating integer check (rating between 1 and 5),
+  contact_for_testing boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table reader_interest (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  genre_interest text,
+  wants_arc boolean not null default false,
+  wants_updates boolean not null default false,
+  message text,
+  created_at timestamptz not null default now()
+);
+
 create or replace view public_matches as
 select
   id,
@@ -197,6 +220,8 @@ alter table messages enable row level security;
 alter table votes enable row level security;
 alter table moderation_warnings enable row level security;
 alter table audience_viewers enable row level security;
+alter table beta_feedback enable row level security;
+alter table reader_interest enable row level security;
 
 create policy "profiles readable" on profiles for select using (true);
 create policy "profiles upsert own" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -209,6 +234,11 @@ create policy "votes updatable by owner token" on votes for update using (true) 
 create policy "votes readable aggregate only" on votes for select using (auth.role() = 'service_role');
 create policy "service role manages moderation warnings" on moderation_warnings for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 create policy "service role manages audience viewers" on audience_viewers for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "beta feedback insertable by visitors" on beta_feedback for insert to anon, authenticated with check (true);
+create policy "reader interest insertable by visitors" on reader_interest for insert to anon, authenticated with check (true);
+
+grant insert on beta_feedback to anon, authenticated;
+grant insert on reader_interest to anon, authenticated;
 
 grant select on public_matches to anon, authenticated;
 grant select on public_messages to anon, authenticated;

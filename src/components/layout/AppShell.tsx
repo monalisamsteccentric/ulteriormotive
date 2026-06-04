@@ -38,6 +38,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <nav className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 text-sm font-black uppercase tracking-[0.18em] text-mist sm:-mx-0 sm:flex-wrap sm:px-0 sm:text-xs">
+            <NavLink href="/how-to-play">How To Play</NavLink>
+            <NavLink href="/books">Books</NavLink>
+            <NavLink href="/about-builder">About Builder</NavLink>
+            <NavLink href="/support">Support</NavLink>
             <NavLink href="/leaderboard">Leaderboard</NavLink>
             <NavLink href="/championship">Championship</NavLink>
             <NavLink href="/monthly-final">Final</NavLink>
@@ -49,6 +53,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       {children}
+      <footer className="mt-auto pt-8">
+        <div className="flex flex-col gap-4 rounded-lg border border-line bg-ink/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-mist">Ulterior Motive explores hidden identity, deception, and human behavior.</p>
+          <nav className="flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.16em] text-mist">
+            <FooterLink href="/how-to-play">How To Play</FooterLink>
+            <FooterLink href="/books">Books</FooterLink>
+            <FooterLink href="/about-builder">About Builder</FooterLink>
+            <FooterLink href="/support">Support</FooterLink>
+          </nav>
+        </div>
+      </footer>
       </div>
     </main>
   );
@@ -57,6 +72,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 function NavLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} className="shrink-0 rounded-lg border border-line bg-white/10 px-3 py-2 leading-none">
+      {children}
+    </Link>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="rounded-lg border border-line bg-white/10 px-3 py-2 leading-none transition hover:border-white/45">
       {children}
     </Link>
   );
