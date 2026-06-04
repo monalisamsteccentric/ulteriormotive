@@ -1,7 +1,6 @@
 import { JoinMatchForm } from "@/components/match/JoinMatchForm";
 import { AppShell } from "@/components/layout/AppShell";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { inviteUrl } from "@/lib/utils";
 import { PublicMatch } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -32,16 +31,11 @@ export default async function JoinPage({
 
   return (
     <AppShell>
-      <section className="mb-7">
-        <p className="text-sm font-black uppercase text-neon">Invitation intercepted</p>
-        <h1 className="mt-2 text-5xl font-black leading-none text-white sm:text-7xl">Join Match</h1>
-        <p className="mt-4 max-w-3xl text-lg font-bold leading-8 text-mist">
-          Take the open seat before the timer expires. Nobody will know who controls you until reveal.
-        </p>
+      <section className="mb-5 text-center">
+        <h1 className="text-4xl font-black leading-tight text-white sm:text-5xl">Join Match</h1>
       </section>
       <JoinMatchForm
         inviteCode={normalizedInviteCode}
-        inviteUrl={inviteUrl(normalizedInviteCode)}
         match={publicMatch}
         createdMatchId={created ?? null}
         creatorSeat={creatorSeat}

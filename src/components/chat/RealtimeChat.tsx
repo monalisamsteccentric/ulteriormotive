@@ -163,7 +163,7 @@ export function RealtimeChat({
     if (liveStatus !== "live") return;
     const id = window.setInterval(() => {
       fetch(`/api/matches/${matchId}/ai-tick`, { method: "POST" });
-    }, 9000);
+    }, 1000);
     return () => window.clearInterval(id);
   }, [matchId, liveStatus]);
 

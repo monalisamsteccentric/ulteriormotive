@@ -29,9 +29,9 @@ export default async function ReplayPage({ params }: { params: Promise<{ matchId
             targetActualType: "ai" as const,
             guessedType: "ai" as const,
             correct: true,
-            baseScore: 100,
+            baseScore: 0,
             percentChange: 30,
-            finalScore: 130
+            finalScore: 30
           },
           playerBScore: {
             role: "player_b" as const,
@@ -39,9 +39,9 @@ export default async function ReplayPage({ params }: { params: Promise<{ matchId
             targetActualType: "human" as const,
             guessedType: "ai" as const,
             correct: false,
-            baseScore: 100,
+            baseScore: 0,
             percentChange: -30,
-            finalScore: 70
+            finalScore: 0
           },
           scoreWinner: "player_a" as const
         }

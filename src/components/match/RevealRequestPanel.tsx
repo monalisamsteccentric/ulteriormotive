@@ -18,8 +18,6 @@ type RevealRequestPanelProps = {
   initialNow: number;
 };
 
-const MIN_REVEAL_MS = 2 * 60 * 1000;
-
 export function RevealRequestPanel({
   matchId,
   status,
@@ -36,8 +34,6 @@ export function RevealRequestPanel({
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [now, setNow] = useState(initialNow);
-  const [requestedTimeLabel, setRequestedTimeLabel] = useState("");
   const [alertDismissed, setAlertDismissed] = useState(false);
 
   const syncMatchStatus = useCallback(async () => {
@@ -61,22 +57,6 @@ export function RevealRequestPanel({
   useEffect(() => {
     setUserId(localStorage.getItem("hidden_user_id"));
   }, []);
-
-  useEffect(() => {
-    setNow(Date.now());
-    const id = window.setInterval(() => {
-      setNow(Date.now());
-    }, 5000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (!revealRequestedAt) {
-      setRequestedTimeLabel("");
-      return;
-    }
-    setRequestedTimeLabel(new Date(revealRequestedAt).toLocaleTimeString());
-  }, [revealRequestedAt]);
 
   useEffect(() => {
     const supabase = supabaseClient();
@@ -110,9 +90,10 @@ export function RevealRequestPanel({
     return "audience";
   }, [forceAudience, playerAUserId, playerBUserId, userId]);
 
-  const revealElapsedMs = startedAt ? now - new Date(startedAt).getTime() : 0;
-  const secondsLeft = Math.max(0, Math.ceil((MIN_REVEAL_MS - revealElapsedMs) / 1000));
-  const locked = status !== "live" || secondsLeft > 0;
+  void startedAt;
+  void revealRequestedAt;
+  void initialNow;
+  const locked = status !== "live";
   const requestedByMe = Boolean(userId && revealRequestedByUserId === userId);
   const requestedByOther = Boolean(role !== "audience" && userId && revealRequestedByUserId && revealRequestedByUserId !== userId);
 
@@ -155,9 +136,9 @@ export function RevealRequestPanel({
               <BellRing size={18} />
             </div>
             <div className="min-w-0">
-              <p className="text-base font-black text-white sm:text-sm">Reveal Truth was requested by the other player.</p>
+              <p className="text-base font-black text-white sm:text-sm">The other player revealed the truth.</p>
               <p className="mt-1 text-sm font-bold leading-6 text-mist sm:text-xs sm:leading-5">
-                Scroll down to accept the request and expose the identities.
+                Open the reveal screen to see the identities and score.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Button type="button" onClick={scrollToRevealPanel}>Go to Reveal Truth</Button>
@@ -173,22 +154,19 @@ export function RevealRequestPanel({
         <p className="mt-1 text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">
           {status === "revealed" || status === "completed"
             ? "Identities are unlocked."
-            : secondsLeft > 0
-              ? `Reveal unlocks in ${secondsLeft}s.`
-              : "Request a reveal when you think you've solved the match."}
+            : "Choose your opponent's identity on the Prediction Board, then reveal immediately."}
         </p>
       </div>
       {revealRequestedByUserId ? (
         <div className="mb-3 rounded-lg border border-line bg-panel p-3 text-base font-bold leading-7 text-white sm:text-sm sm:leading-normal">
-          {requestedByMe ? "You requested Reveal Truth. Waiting for the other player." : "The other player requested Reveal Truth."}
-          {requestedTimeLabel ? <p className="mt-1 text-sm text-mist sm:text-xs">Requested {requestedTimeLabel}</p> : null}
+          {requestedByMe ? "You revealed the truth." : "The other player revealed the truth."}
         </div>
       ) : null}
       {role === "audience" ? (
         <p className="text-base font-bold leading-7 text-mist sm:text-sm sm:leading-6">Audience can watch and vote, but only players can trigger Reveal Truth.</p>
       ) : (
         <Button className="w-full" disabled={busy || locked || requestedByMe} onClick={submit}>
-          {requestedByOther ? "Agree and Reveal Truth" : requestedByMe ? "Waiting for approval" : "Reveal Truth"}
+          {requestedByOther ? "Open Reveal" : requestedByMe ? "Revealed" : "Reveal Truth"}
         </Button>
       )}
       {error ? <p className="mt-3 text-sm font-bold text-shock">{error}</p> : null}

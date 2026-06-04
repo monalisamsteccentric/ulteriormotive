@@ -4,7 +4,6 @@ import { supabaseServer } from "./supabaseServer";
 import { cleanMessage, createInviteCode, validateMessage } from "./utils";
 
 const aiTurnLocks = new Map<string, Promise<unknown>>();
-const MIN_REVEAL_MS = 2 * 60 * 1000;
 const WAIT_REMINDER_MS = 60 * 1000;
 
 // Edit this when you want the auto-filled AI opponent to use a different default personality.
@@ -400,7 +399,7 @@ async function sendAiTurnIfNeeded(match: PrivateMatch) {
   if (error) throw error;
 
   const lastMessage = messages?.at(-1) as Message | undefined;
-  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < 6_000) return null;
+  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < replyDelayMs(lastMessage.message)) return null;
   if (lastMessage?.is_ai_generated && !(playerAIsAi && playerBIsAi)) return null;
 
   const role = nextAiRole({ lastMessage, playerAIsAi, playerBIsAi });
@@ -408,7 +407,6 @@ async function sendAiTurnIfNeeded(match: PrivateMatch) {
 
   const strategy = role === "player_a" ? match.player_a_ai_strategy : match.player_b_ai_strategy;
   const reply = await createAiReplyResult(role, (messages ?? []) as Message[], strategy);
-  await new Promise((resolve) => setTimeout(resolve, replyDelayMs(reply.completionTokens)));
   return sendMessage({
     matchId: match.id,
     senderRole: role,
@@ -457,7 +455,7 @@ export async function getRevealStats(matchId: string): Promise<RevealStats> {
   const supabase = await supabaseServer();
   const { data: match, error: matchError } = await supabase
     .from("matches")
-    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, status")
+    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, reveal_requested_by_user_id, status")
     .eq("id", matchId)
     .single();
   if (matchError) throw matchError;
@@ -480,6 +478,7 @@ export async function getRevealStats(matchId: string): Promise<RevealStats> {
     playerBType,
     playerAUserId: match.player_a_user_id,
     playerBUserId: match.player_b_user_id,
+    revealRequestedByUserId: match.reveal_requested_by_user_id,
     votes: (votes ?? []) as { voter_user_id: string; vote: VoteChoice }[]
   });
 }
@@ -489,12 +488,14 @@ function buildRevealStats({
   playerBType,
   playerAUserId,
   playerBUserId,
+  revealRequestedByUserId,
   votes
 }: {
   playerAType: ControlType;
   playerBType: ControlType;
   playerAUserId: string | null;
   playerBUserId: string | null;
+  revealRequestedByUserId: string | null;
   votes: { voter_user_id: string; vote: VoteChoice }[];
 }): RevealStats {
   const audienceVotes = votes.filter((row) => row.voter_user_id !== playerAUserId && row.voter_user_id !== playerBUserId);
@@ -528,14 +529,17 @@ function buildRevealStats({
     role: "player_a",
     targetRole: "player_b",
     targetActualType: playerBType,
-    guessedType: playerAVote ? guessForRole(playerAVote, "player_b") : null
+    guessedType: playerAVote ? guessForRole(playerAVote, "player_b") : null,
+    revealedByThisPlayer: revealRequestedByUserId === playerAUserId
   });
   const playerBScore = buildPlayerScore({
     role: "player_b",
     targetRole: "player_a",
     targetActualType: playerAType,
-    guessedType: playerBVote ? guessForRole(playerBVote, "player_a") : null
+    guessedType: playerBVote ? guessForRole(playerBVote, "player_a") : null,
+    revealedByThisPlayer: revealRequestedByUserId === playerBUserId
   });
+  applyRevealPenalty(playerAScore, playerBScore);
   const scoreWinner =
     playerAScore.finalScore > playerBScore.finalScore
       ? "player_a"
@@ -572,8 +576,9 @@ function buildPlayerScore(input: {
   targetRole: PlayerRole;
   targetActualType: ControlType;
   guessedType: ControlType | null;
+  revealedByThisPlayer: boolean;
 }) {
-  const baseScore = 100;
+  const baseScore = 0;
   const correct = input.guessedType ? input.guessedType === input.targetActualType : null;
   const percentChange = correct === null ? 0 : correct ? 30 : -30;
 
@@ -582,8 +587,19 @@ function buildPlayerScore(input: {
     correct,
     baseScore,
     percentChange,
-    finalScore: Math.round(baseScore * (1 + percentChange / 100))
+    finalScore: input.revealedByThisPlayer && correct === true ? 30 : 0
   };
+}
+
+function applyRevealPenalty(playerAScore: ReturnType<typeof buildPlayerScore>, playerBScore: ReturnType<typeof buildPlayerScore>) {
+  if (playerAScore.revealedByThisPlayer && playerAScore.correct === false) {
+    playerAScore.finalScore = -30;
+    playerBScore.finalScore += 30;
+  }
+  if (playerBScore.revealedByThisPlayer && playerBScore.correct === false) {
+    playerBScore.finalScore = -30;
+    playerAScore.finalScore += 30;
+  }
 }
 
 function percent(value: number, total: number) {
@@ -607,39 +623,40 @@ export async function requestReveal(input: { matchId: string; userId: string }) 
     throw new Error("Only Player A or Player B can request reveal.");
   }
 
-  const startedAt = match.started_at ?? match.created_at;
-  const elapsedMs = Date.now() - new Date(startedAt).getTime();
-  if (elapsedMs < MIN_REVEAL_MS) {
-    const secondsLeft = Math.ceil((MIN_REVEAL_MS - elapsedMs) / 1000);
-    throw new Error(`Reveal unlocks in ${secondsLeft} seconds.`);
-  }
-
-  if (!match.reveal_requested_by_user_id) {
-    const requestedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from("matches")
-      .update({ reveal_requested_by_user_id: input.userId, reveal_requested_at: requestedAt })
-      .eq("id", input.matchId);
-    if (updateError) throw updateError;
-    await broadcastMatchUpdate(input.matchId);
-    return { status: "requested" as const, revealRequestedByUserId: input.userId, revealRequestedAt: requestedAt };
-  }
-
-  if (match.reveal_requested_by_user_id === input.userId) {
-    return {
-      status: "waiting_for_other" as const,
-      revealRequestedByUserId: match.reveal_requested_by_user_id,
-      revealRequestedAt: match.reveal_requested_at
-    };
-  }
+  await ensurePlayerGuessedOpponent(supabase, match, input.userId);
 
   const { error: revealError } = await supabase
     .from("matches")
-    .update({ status: "revealed", revealed_at: new Date().toISOString() })
+    .update({
+      status: "revealed",
+      revealed_at: new Date().toISOString(),
+      reveal_requested_by_user_id: input.userId,
+      reveal_requested_at: new Date().toISOString()
+    })
     .eq("id", input.matchId);
   if (revealError) throw revealError;
   await broadcastMatchUpdate(input.matchId);
   return { status: "revealed" as const };
+}
+
+async function ensurePlayerGuessedOpponent(supabase: any, match: PrivateMatch, userId: string) {
+  const { data, error } = await supabase
+    .from("votes")
+    .select("vote")
+    .eq("match_id", match.id)
+    .eq("voter_user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const vote = data?.vote as VoteChoice | undefined;
+  if (!vote) throw new Error("Choose whether the other player is AI or human before revealing.");
+
+  if (userId === match.player_a_user_id && vote !== "none_ai" && vote !== "player_b_ai") {
+    throw new Error("Choose whether Player B is AI or human before revealing.");
+  }
+  if (userId === match.player_b_user_id && vote !== "none_ai" && vote !== "player_a_ai") {
+    throw new Error("Choose whether Player A is AI or human before revealing.");
+  }
 }
 
 export type { PublicMatch };

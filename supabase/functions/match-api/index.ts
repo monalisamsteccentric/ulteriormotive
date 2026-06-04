@@ -5,9 +5,7 @@ type ControlType = "human" | "ai";
 type PlayerRole = "player_a" | "player_b";
 type VoteChoice = "player_a_ai" | "player_b_ai" | "both_ai" | "none_ai";
 
-const MIN_REVEAL_MS = 2 * 60 * 1000;
 const WAIT_REMINDER_MS = 60 * 1000;
-const AI_REPLY_DELAY_MS = 12_000;
 const MAX_MODERATION_WARNINGS = 3;
 const DEFAULT_AI_STRATEGY =
   "You joined because the other player did not arrive before the waiting timer ended. Sound like a casual human texting on mobile. Keep replies short, natural, slightly imperfect, and avoid meta talk about being artificial.";
@@ -222,7 +220,7 @@ async function sendNextAiMessage(supabase: any, matchId: string) {
   if (messageError) throw messageError;
 
   const lastMessage = messages?.at(-1);
-  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < AI_REPLY_DELAY_MS) return null;
+  if (lastMessage && Date.now() - new Date(lastMessage.created_at).getTime() < aiReplyDelayMs(lastMessage.message)) return null;
   if (lastMessage?.is_ai_generated && !(playerAIsAi && playerBIsAi)) return null;
 
   const role = nextAiRole(lastMessage, playerAIsAi, playerBIsAi);
@@ -255,6 +253,10 @@ async function createAiReply(role: PlayerRole, messages: any[], strategy?: strin
     ]
   });
   return completion.choices[0]?.message.content?.trim() || "wait what";
+}
+
+function aiReplyDelayMs(message: string) {
+  return Math.max(0, String(message ?? "").length * 500);
 }
 
 async function enforceHumanMessageSafety(supabase: any, input: any, text: string) {
@@ -366,25 +368,41 @@ async function requestReveal(supabase: any, input: any) {
   if (match.status === "revealed" || match.status === "completed") return { status: "revealed" };
   if (match.status !== "live") throw new Error("Match is not live yet.");
   if (userId !== match.player_a_user_id && userId !== match.player_b_user_id) throw new Error("Only Player A or Player B can request reveal.");
-  const elapsedMs = Date.now() - new Date(match.started_at ?? match.created_at).getTime();
-  if (elapsedMs < MIN_REVEAL_MS) throw new Error(`Reveal unlocks in ${Math.ceil((MIN_REVEAL_MS - elapsedMs) / 1000)} seconds.`);
-  if (!match.reveal_requested_by_user_id) {
-    const revealRequestedAt = new Date().toISOString();
-    const { error: updateError } = await supabase.from("matches").update({ reveal_requested_by_user_id: userId, reveal_requested_at: revealRequestedAt }).eq("id", matchId);
-    if (updateError) throw updateError;
-    logTransition("reveal-requested", matchId, { userId });
-    await broadcastMatchUpdate(supabase, matchId);
-    return { status: "requested", revealRequestedByUserId: userId, revealRequestedAt };
-  }
-  if (match.reveal_requested_by_user_id === userId) {
-    return { status: "waiting_for_other", revealRequestedByUserId: match.reveal_requested_by_user_id, revealRequestedAt: match.reveal_requested_at };
-  }
-  const { error: revealError } = await supabase.from("matches").update({ status: "revealed", revealed_at: new Date().toISOString() }).eq("id", matchId);
+  await ensurePlayerGuessedOpponent(supabase, match, userId);
+  const { error: revealError } = await supabase
+    .from("matches")
+    .update({
+      status: "revealed",
+      revealed_at: new Date().toISOString(),
+      reveal_requested_by_user_id: userId,
+      reveal_requested_at: new Date().toISOString()
+    })
+    .eq("id", matchId);
   if (revealError) throw revealError;
   await scoreRegularMatch(supabase, matchId);
-  logTransition("revealed", matchId, { approvedBy: userId, requestedBy: match.reveal_requested_by_user_id });
+  logTransition("revealed", matchId, { revealedBy: userId });
   await broadcastMatchUpdate(supabase, matchId);
   return { status: "revealed" };
+}
+
+async function ensurePlayerGuessedOpponent(supabase: any, match: any, userId: string) {
+  const { data, error } = await supabase
+    .from("votes")
+    .select("vote")
+    .eq("match_id", match.id)
+    .eq("voter_user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const vote = data?.vote as VoteChoice | undefined;
+  if (!vote) throw new Error("Choose whether the other player is AI or human before revealing.");
+
+  if (userId === match.player_a_user_id && vote !== "none_ai" && vote !== "player_b_ai") {
+    throw new Error("Choose whether Player B is AI or human before revealing.");
+  }
+  if (userId === match.player_b_user_id && vote !== "none_ai" && vote !== "player_a_ai") {
+    throw new Error("Choose whether Player A is AI or human before revealing.");
+  }
 }
 
 async function vote(supabase: any, input: any) {
@@ -397,9 +415,6 @@ async function vote(supabase: any, input: any) {
     .single();
   if (matchError) throw matchError;
   if (match.status === "revealed" || match.status === "completed") throw new Error("Voting is closed for this match.");
-  if (input.voterUserId === match.player_a_user_id || input.voterUserId === match.player_b_user_id) {
-    throw new Error("Players cannot vote in their own match.");
-  }
   await ensureVoterAllowed(supabase, String(input.voterUserId));
 
   const { error } = await supabase.from("votes").upsert(
@@ -416,12 +431,19 @@ async function vote(supabase: any, input: any) {
 async function voteStatsResponse(supabase: any, input: any) {
   const matchId = String(input.matchId || "");
   if (!matchId) throw new Error("Missing matchId.");
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("player_a_user_id, player_b_user_id")
+    .eq("id", matchId)
+    .single();
+  if (matchError) throw matchError;
+
   const { data: votes, error: votesError } = await supabase
     .from("audience_votes")
     .select("voter_user_id, vote")
     .eq("match_id", matchId);
   if (votesError) throw votesError;
-  const stats = buildVoteStats(votes ?? [], null, null);
+  const stats = buildVoteStats(votes ?? [], match.player_a_user_id, match.player_b_user_id);
   if (input.voterUserId) {
     const { data: selected } = await supabase.from("votes").select("vote").eq("match_id", matchId).eq("voter_user_id", input.voterUserId).maybeSingle();
     return { ...stats, selectedVote: selected?.vote ?? null };
@@ -466,7 +488,7 @@ async function revealStats(supabase: any, input: any) {
 
   const { data: match, error: matchError } = await supabase
     .from("matches")
-    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, status")
+    .select("player_a_user_id, player_b_user_id, player_a_control_type, player_b_control_type, reveal_requested_by_user_id, status")
     .eq("id", matchId)
     .single();
   if (matchError) throw matchError;
@@ -489,6 +511,7 @@ async function revealStats(supabase: any, input: any) {
     playerBType,
     playerAUserId: match.player_a_user_id,
     playerBUserId: match.player_b_user_id,
+    revealRequestedByUserId: match.reveal_requested_by_user_id,
     votes: votes ?? []
   });
 }
@@ -912,12 +935,14 @@ function buildRevealStats({
   playerBType,
   playerAUserId,
   playerBUserId,
+  revealRequestedByUserId,
   votes
 }: {
   playerAType: ControlType;
   playerBType: ControlType;
   playerAUserId: string | null;
   playerBUserId: string | null;
+  revealRequestedByUserId: string | null;
   votes: { voter_user_id: string; vote: VoteChoice }[];
 }) {
   const audienceVotes = votes.filter((row) => row.voter_user_id !== playerAUserId && row.voter_user_id !== playerBUserId);
@@ -951,14 +976,17 @@ function buildRevealStats({
     role: "player_a",
     targetRole: "player_b",
     targetActualType: playerBType,
-    guessedType: playerAVote ? guessForRole(playerAVote, "player_b") : null
+    guessedType: playerAVote ? guessForRole(playerAVote, "player_b") : null,
+    revealedByThisPlayer: revealRequestedByUserId === playerAUserId
   });
   const playerBScore = buildPlayerScore({
     role: "player_b",
     targetRole: "player_a",
     targetActualType: playerAType,
-    guessedType: playerBVote ? guessForRole(playerBVote, "player_a") : null
+    guessedType: playerBVote ? guessForRole(playerBVote, "player_a") : null,
+    revealedByThisPlayer: revealRequestedByUserId === playerBUserId
   });
+  applyRevealPenalty(playerAScore, playerBScore);
   const scoreWinner =
     playerAScore.finalScore > playerBScore.finalScore
       ? "player_a"
@@ -993,8 +1021,9 @@ function buildPlayerScore(input: {
   targetRole: PlayerRole;
   targetActualType: ControlType;
   guessedType: ControlType | null;
+  revealedByThisPlayer: boolean;
 }) {
-  const baseScore = 100;
+  const baseScore = 0;
   const correct = input.guessedType ? input.guessedType === input.targetActualType : null;
   const percentChange = correct === null ? 0 : correct ? 30 : -30;
 
@@ -1003,8 +1032,19 @@ function buildPlayerScore(input: {
     correct,
     baseScore,
     percentChange,
-    finalScore: Math.round(baseScore * (1 + percentChange / 100))
+    finalScore: input.revealedByThisPlayer && correct === true ? 30 : 0
   };
+}
+
+function applyRevealPenalty(playerAScore: ReturnType<typeof buildPlayerScore>, playerBScore: ReturnType<typeof buildPlayerScore>) {
+  if (playerAScore.revealedByThisPlayer && playerAScore.correct === false) {
+    playerAScore.finalScore = -30;
+    playerBScore.finalScore += 30;
+  }
+  if (playerBScore.revealedByThisPlayer && playerBScore.correct === false) {
+    playerBScore.finalScore = -30;
+    playerAScore.finalScore += 30;
+  }
 }
 
 function percent(value: number, total: number) {

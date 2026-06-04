@@ -28,9 +28,9 @@ export default async function RevealPage({ params }: { params: Promise<{ matchId
         targetActualType: "ai" as const,
         guessedType: "ai" as const,
         correct: true,
-        baseScore: 100,
+        baseScore: 0,
         percentChange: 30,
-        finalScore: 130
+        finalScore: 30
       },
       playerBScore: {
         role: "player_b" as const,
@@ -38,9 +38,9 @@ export default async function RevealPage({ params }: { params: Promise<{ matchId
         targetActualType: "human" as const,
         guessedType: "ai" as const,
         correct: false,
-        baseScore: 100,
+        baseScore: 0,
         percentChange: -30,
-        finalScore: 70
+        finalScore: 0
       },
       scoreWinner: "player_a" as const
     };
@@ -64,9 +64,9 @@ export default async function RevealPage({ params }: { params: Promise<{ matchId
       <AppShell>
         <section className="rounded-lg border border-line bg-ink p-5">
           <p className="text-sm font-black uppercase text-mist">Reveal not ready</p>
-          <h1 className="mt-2 text-3xl font-black text-white">Both players must agree before reveal.</h1>
+          <h1 className="mt-2 text-3xl font-black text-white">Make your guess before reveal.</h1>
           <p className="mt-3 text-sm font-bold leading-6 text-mist">
-            Return to the match room and use the reveal request panel. Reveal is blocked until at least two minutes have passed.
+            Return to the match room, choose whether the other player is AI or human, then press Reveal Truth.
           </p>
           <Link href={`/match/${matchId}`} className="mt-5 inline-flex min-h-12 items-center justify-center rounded-lg border border-line bg-panel px-4 text-sm font-black">
             Back to match

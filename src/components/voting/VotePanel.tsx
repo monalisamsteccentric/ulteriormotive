@@ -121,7 +121,7 @@ export function VotePanel({ matchId, userId, playerAUserId, playerBUserId, initi
         : null;
   const title = "Prediction Board";
   const subtitle = playerGuessOptions
-    ? "Guess your opposite player. Correct: +30%. Wrong: -30%."
+    ? "Guess your opposite player before revealing. Correct: +30. Wrong reveal: -30 to you, +30 to them."
     : "Decide who is human, who is AI, and who is bluffing.";
 
   return (

@@ -43,7 +43,7 @@ export function RevealClient({ stats, replayHref }: { stats: RevealStats; replay
         <p className="text-sm font-black uppercase text-mist">Score winner</p>
         <p className="text-4xl font-black text-shock">{winnerLabel}</p>
         <p className="mt-2 text-sm font-bold leading-6 text-mist">
-          Each player started at 100 points. A correct opposite-player guess adds 30%. A wrong guess removes 30%.
+          Each player starts at 0. The player who revealed gains 30 for a correct guess; a wrong reveal gives them -30 and the other player +30.
         </p>
         <p className="mt-2 text-sm font-bold leading-6 text-white">{scoreReason}</p>
       </section>
@@ -91,8 +91,8 @@ function ScoreCard({ label, score }: { label: string; score: RevealStats["player
     score.correct === null
       ? "No score change"
       : score.correct
-        ? "+30% for a correct guess"
-        : "-30% for a wrong guess";
+        ? "+30 for a correct reveal guess"
+        : "-30 for a wrong reveal guess";
 
   return (
     <section className="rounded-lg border border-line bg-ink p-5">

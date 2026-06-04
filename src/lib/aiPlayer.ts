@@ -134,9 +134,8 @@ export function randomAiDelayMs() {
   return 1800 + Math.floor(Math.random() * 6200);
 }
 
-export function replyDelayMs(tokens: number) {
-  const jitter = Math.floor(Math.random() * 900);
-  return Math.min(12_000, Math.max(1_800, 900 + tokens * 260 + jitter));
+export function replyDelayMs(content: string) {
+  return Math.max(0, content.length * 500);
 }
 
 function estimateTokens(content: string) {
