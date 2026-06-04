@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, Orbitron, Oxanium, Space_Grotesk, Syncopate } from "next/font/google";
+import { BetaNoticeModal } from "@/components/layout/BetaNoticeModal";
 import "./globals.css";
 
 const chakraPetch = Chakra_Petch({
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${chakraPetch.variable} ${syncopate.variable} ${oxanium.variable} ${spaceGrotesk.variable} ${orbitron.variable}`}>
+        <BetaNoticeModal />
         {children}
       </body>
     </html>

@@ -51,7 +51,9 @@ export default function HowToPlayPage() {
           <p className="mt-2 text-base font-bold leading-7 text-white">Please submit feedback using the form below.</p>
         </section>
 
-        <BetaFeedbackForm />
+        <section id="beta-feedback" className="scroll-mt-24">
+          <BetaFeedbackForm />
+        </section>
       </div>
     </AppShell>
   );
