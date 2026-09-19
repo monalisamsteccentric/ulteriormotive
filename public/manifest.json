@@ -1,9 +1,0 @@
-{
-  "name": "Ulterior Motive",
-  "short_name": "Motive",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#080912",
-  "theme_color": "#080912",
-  "icons": []
-}

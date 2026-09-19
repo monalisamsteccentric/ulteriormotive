@@ -1,116 +1,103 @@
 # Ulterior Motive
 
-Ulterior Motive is a mobile-first social deduction chat MVP built with Next.js, TypeScript, Tailwind CSS, Supabase, and OpenAI. Player A and Player B are always public labels; whether either side is human-controlled or AI-controlled is stored privately and only revealed after the match enters `revealed` or `completed`.
+A fresh Next.js MVP for a gamified content-discovery mosaic. The previous application's working tree has been replaced; Git history is preserved.
 
-## Stack
+## Develop entirely in GitHub Codespaces
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- Supabase Auth, Postgres, Realtime
-- OpenAI for AI player replies
-- Vercel-ready deployment
-- PWA-ready `manifest.json`
+Open this repository on GitHub, choose **Code > Codespaces > Create codespace on main**. The dev container provides Node 22 and installs the committed dependency lockfile. No software is required on your computer.
 
-## Setup
+Inside the Codespace terminal:
 
-1. Install dependencies:
-
-```bash
-npm install
-```
-
-2. Copy environment variables:
-
-```bash
+```sh
 cp .env.example .env.local
-```
-
-3. Fill in:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-OPENAI_API_KEY=
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-CRON_SECRET=
-CHAMPIONSHIP_ADMIN_SECRET=
-RESEND_API_KEY=
-WAITING_MATCH_ALERT_EMAIL=monalisa.sahoo.jsr@gmail.com
-WAITING_MATCH_EMAIL_FROM=Ulterior Motive <onboarding@resend.dev>
-```
-
-Set `SERVICE_ROLE_KEY` as a Supabase Edge Function secret only, not in the Next app host. Set the same `CHAMPIONSHIP_ADMIN_SECRET` value in the Next app host and in Supabase Edge Function secrets so logged-in admin routes can invoke protected function actions. Never expose `SERVICE_ROLE_KEY` or `OPENAI_API_KEY` to client code.
-
-4. Run `supabase/schema.sql` in your Supabase SQL editor. If the championship tables are missing, also run `supabase/setup_championship.sql`.
-
-5. Start the app:
-
-```bash
 npm run dev
 ```
 
-## Hidden Identity Security
+Set the variables below using the Codespace editor or Codespaces secrets. Open forwarded port 3000 in your browser. Keep the forwarded port private for development. Never commit real environment files or credentials.
 
-The private columns live only in `matches`:
+| Variable                       | Purpose                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| NEXT_PUBLIC_SUPABASE_URL       | Supabase project's HTTPS API URL                                   |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY  | Public anon/publishable API key                                    |
+| SUPABASE_SERVICE_ROLE_KEY      | Server-only service-role/secret key; never prefix with NEXT_PUBLIC |
+| NEXT_PUBLIC_TURNSTILE_SITE_KEY | Cloudflare Turnstile public site key                               |
 
-- `player_a_control_type`
-- `player_b_control_type`
+The app builds without credentials, but backend operations return a clear setup message until Supabase is configured. Empty installations show an illustrative preview, not fabricated participants or analytics. No seed content is published.
 
-Normal UI reads from `public_matches`, which returns those fields as `null` until `status in ('revealed', 'completed')`. Chat reads from `public_messages`, which excludes `is_ai_generated`. Realtime delivery uses sanitized broadcast payloads from the server API, not raw client subscriptions to private rows.
+## Supabase setup
 
-## Wait Timer
+Use a **new Supabase project**. This migration defines a fresh schema and is not an upgrade for the obsolete application's database. The rebuild does not delete data in an existing Supabase project.
 
-Run `supabase/add_wait_reminder_and_ai_fallback.sql` if you already created the database before this feature existed.
+1. In the Supabase dashboard, open SQL Editor and run `supabase/migrations/202609190001_initial.sql`.
+2. In Authentication, enable anonymous sign-ins. Disable public email signups if they are not needed; invite/create administrator accounts from the dashboard.
+3. Enable Cloudflare Turnstile CAPTCHA for Auth. Add the site's domain and Codespaces preview hostname to the Turnstile widget's allowed hostnames. Configure the CAPTCHA secret in Supabase, and the public site key in application environment settings. Set reasonable Auth signup and sign-in rate limits.
+4. Create/invite the first administrator using Supabase Authentication. Copy its user UUID into this query and run it in SQL Editor:
 
-Vercel cron calls `GET /api/cron/waiting-matches` every minute. The route:
+```sql
+insert into public.admins(user_id) values ('YOUR_ADMIN_USER_UUID');
+```
 
-- Emails `WAITING_MATCH_ALERT_EMAIL` when a waiting match has about one minute left.
-- Includes the match ID, invite code, and join link.
-- Fills the empty seat with AI after `wait_until`, then starts the match.
+5. Sign in at `/admin`. Add content, set its order, and enable it. Upload optional editorial photos in their separate section.
+6. Review the privacy and terms copy for your organization and jurisdiction before inviting participants; replace the generic operator/contact wording with your actual identity and contact channel.
 
-Email uses Resend. Add `RESEND_API_KEY` and set `WAITING_MATCH_EMAIL_FROM` to a verified sender for production. If `RESEND_API_KEY` is missing, the cron still assigns AI after expiry but skips email.
+Storage buckets `participant-photos` and `admin-photos` are private. Do not add public policies or make the buckets public. The server re-encodes accepted JPEG/PNG/WebP uploads to 640x640 WebP, strips metadata, and assigns random paths. Maximum source size is 5 MB and decoded images are limited to 25 megapixels. Participant photo uploads put the tile into pending moderation. Built-in colour avatars appear immediately.
 
-The fallback AI prompt lives in `DEFAULT_EXPIRED_WAIT_AI_STRATEGY` in `src/lib/matchService.ts`.
+## Participant experience
 
-## AI Players
+- Explicit consent (version 2026-09-19), age confirmation and image permission are required.
+- Supabase anonymous Auth persists the participant session in this browser. No email or password is collected from participants. Clearing browser data loses access; no cross-device recovery is promised.
+- Public tiles show display name, avatar/photo and progression only. Hidden and pending participants are excluded.
+- Opening each distinct, enabled content item earns one discovery. Duplicate and concurrent opens cannot inflate rewards. A visit measures an outbound open, not reading completion.
+- Levels start at 0, 1, 3, 6 and 10 discoveries. Tile footprints grow from 1x1 to 2x1 at 3 discoveries and 2x2 at 10. Mosaic positions are not guaranteed.
+- Deleting content retains earned participant growth. Participant deletion removes that participant's visit history from analytics.
+- Delete my data hides the tile first, removes all images in the account's storage folder, then deletes the Auth user. Foreign keys cascade to its profile and visits. Failures remain retryable.
+- Already issued signed image links expire within five minutes. External copies and provider backups cannot be immediately revoked.
+- Editorial photos belong to a separate table/bucket and earn no progress.
 
-AI replies are generated server-side in `src/lib/aiPlayer.ts`. The route `POST /api/matches/[matchId]/ai-tick` checks private match state, waits a random delay, writes an AI message with `is_ai_generated=true`, and broadcasts only the safe public message.
+## Administrator studio
 
-For production, trigger this route from a queue, cron, or Supabase Edge Function after new human/player messages.
+`/admin` supports password sign-in, a server-verified administrator allowlist, content creation/editing/deletion/enable-disable, transactional ordering, participant photo approval/hiding, separate editorial uploads and ordering, and aggregate analytics. Use a separate browser profile for admin and participant sessions.
 
-## Admin
+The MVP supports up to 500 content items and 100 editorial photos. The public mosaic shows up to 120 approved participants ordered by discoveries and 40 enabled editorial photos. Participant moderation is paginated in groups of 50. Analytics include total participants, unique discoveries, pending photos, enabled content, 30-day discovery counts and per-content visits.
 
-`/admin` requires a logged-in Supabase user whose `profiles.is_admin` is true. Admin actions can force start, force reveal, and inject AI. Ban user and secret join are placeholders.
+## Security model
 
-## Vercel Deployment
+All application tables have RLS enabled, with **no direct anon/authenticated access**. The server API verifies Supabase access tokens on every private operation. Admin routes also require a non-anonymous Auth user in the admin allowlist. Browser requests never contain the service-role key.
 
-1. Push this repo to GitHub.
-2. Import the project in Vercel.
-3. Add the environment variables from `.env.example`.
-4. Set `NEXT_PUBLIC_SITE_URL` to your Vercel domain or custom domain.
-5. Deploy.
+Database functions for rate limits, rewards, analytics and ordering are restricted to service_role. Reward updates and content reordering are transactional. Rates persist across server instances and fail closed on database errors. Limits: 90 participant API calls/minute, 120 admin calls/minute, 20 discovery attempts/minute, 5 participant uploads/minute, 10 admin uploads/minute. Public reads use a hashed forwarded-IP key at 120/minute. Rate-limit rows expire and are pruned on subsequent requests.
 
-## MVP Routes
+Supabase Auth CAPTCHA and signup limits are mandatory production controls: per-account limits alone cannot prevent account creation abuse. Configure AWS WAF or equivalent edge limits for public API traffic; forwarded-IP limits are defense in depth, not trusted identity. App-managed rate-limit keys contain hashes rather than raw IP addresses.
 
-- `/`
-- `/login`
-- `/create`
-- `/join/[inviteCode]`
-- `/match/[matchId]`
-- `/match/[matchId]/reveal`
-- `/match/[matchId]/replay`
-- `/profile`
-- `/admin`
+Mutations require bearer tokens, reject cross-site browser requests, enforce request size limits, validate inputs, and reject local/non-HTTPS content destinations. Image bytes are decoded/re-encoded rather than trusting file extensions. Photo changes cannot override a concurrent moderation hide. Restrictive headers cover framing, object embedding, MIME sniffing and referrers. CSP allows inline framework scripts/styles; it does not use per-request nonces.
 
-## Future TODOs
+## AWS Amplify deployment
 
-- Voice mode
-- Influencer AI clone
-- Monalisa AI
-- AI memory
-- Ranked leaderboard
-- Viral clip generator
-- Livestream OBS mode
-- Coins/betting mode
+1. In AWS Amplify Hosting, connect this GitHub repository and select `main`.
+2. Select the Next.js SSR hosting platform. This app uses the latest installed Next.js 15 patch because Amplify's documented managed support covers versions 12x15.
+3. Set the four environment variables above in Amplify's environment settings. Protect access to the server-only service-role key.
+4. Amplify uses `amplify.yml`: Node 22 > `npm ci` ? required-environment validation ? typecheck/tests ? production build.
+5. The environment script writes only the four named variables to the untracked `.env.production` for Next.js server runtime availability. The server-only secret is not a NEXT_PUBLIC variable and must never be used in client code. Restrict build-artifact, log and Amplify-console access because runtime credentials are available to trusted build/hosting infrastructure.
+6. Configure Supabase Auth site URL and Turnstile allowed hostnames for the deployed domain. Invite admins, publish content and complete the launch checks below.
+
+The repository includes deployment configuration, but creating the AWS/Supabase resources and setting their secrets requires access to those services. No existing service credentials are reused by this replacement.
+
+Official references: [Amplify Next.js support](https://docs.aws.amazon.com/amplify/latest/userguide/ssr-amplify-support.html), [SSR environment variables](https://docs.aws.amazon.com/amplify/latest/userguide/ssr-environment-variables.html), [Supabase anonymous Auth](https://supabase.com/docs/guides/auth/auth-anonymous).
+
+## Validation in Codespaces
+
+```sh
+npm run check
+npx playwright install --with-deps chromium
+npm run test:e2e
+npm audit
+```
+
+- Domain tests check progression boundaries, consent and destination validation.
+- SQL tests run the real migration against an isolated PostgreSQL-compatible PGlite database with mocked Supabase Auth/Storage schemas. They exercise direct-access denial, RPC privileges, unique rewards, moderation, rate limits, atomic ordering and deletion cascades.
+- API tests use an isolated fake Supabase HTTP service to check token validation, admin authorization, consent, upload decoding, moderation restrictions and retryable deletion.
+- Browser tests run the production build at desktop/mobile sizes, checking navigation, consent UI, filtering, error handling and API boundary protections.
+- These tests do not substitute for checking the real Supabase Auth/Storage services after deployment.
+
+Before inviting users: join with Turnstile, upload a real image, approve it from a separate admin browser session, open the same content twice, verify one reward, test disabled content and hidden participants, then delete the participant and verify its Auth user, database rows and storage objects are gone. Check CSP and sign-in on your actual domain.
+
+GitHub Actions runs validation on pushes/PRs. Node/npm operations for this implementation, dependency installation, lockfile generation, build and test execution were performed in GitHub Codespaces. Production and CI builds run in their respective cloud environments.
