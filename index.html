@@ -23,6 +23,29 @@
       <p id="result-text" class="result-text"></p>
     </section>
     <p id="message" class="message" role="status" aria-live="polite"></p>
+    <button id="admin-open" class="admin-open" type="button" aria-haspopup="dialog">ADMIN ACCESS <span aria-hidden="true">↗</span></button>
+    <dialog id="admin-dialog" class="admin-dialog" aria-labelledby="admin-title">
+      <button id="admin-close" class="admin-close" type="button" aria-label="Close admin panel">×</button>
+      <p class="admin-kicker">AURA / PRIVATE ACCESS</p>
+      <h2 id="admin-title">The archive</h2>
+      <p class="admin-intro">Add a code and the text it reveals.</p>
+      <form id="admin-login" class="admin-form">
+        <label for="admin-username">Username</label>
+        <input id="admin-username" name="username" autocomplete="username" required>
+        <label for="admin-password">Password</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+        <button class="admin-submit" type="submit">ENTER THE ARCHIVE <span aria-hidden="true">→</span></button>
+      </form>
+      <form id="admin-editor" class="admin-form" hidden>
+        <label for="new-code">Code</label>
+        <input id="new-code" name="code" maxlength="64" placeholder="e.g. WELCOME" autocomplete="off" required>
+        <label for="new-text">Text to reveal</label>
+        <textarea id="new-text" name="text" maxlength="10000" rows="7" placeholder="Write the message shown for this code..." required></textarea>
+        <button class="admin-submit" type="submit">SAVE CODE <span aria-hidden="true">→</span></button>
+        <button id="admin-logout" class="admin-logout" type="button">Sign out</button>
+      </form>
+      <p id="admin-message" class="admin-message" role="status" aria-live="polite"></p>
+    </dialog>
   </main>
 </body>
 </html>

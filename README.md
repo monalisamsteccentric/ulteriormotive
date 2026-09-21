@@ -1,21 +1,30 @@
 # Aura
 
-A static code lookup page hosted by the existing Amazon Amplify app. It makes a public read-only request to a Lambda Function URL; Lambda reads one item from DynamoDB. There are no npm packages or local installation steps.
+A static code lookup page hosted by Amazon Amplify. Visitors search a code and read its text. An admin panel lets you add codes after signing in. The website has no npm packages or local installation steps.
 
-## One-time AWS setup
+## AWS setup
 
-1. **Fix the existing Amplify app's platform.** It was created for Next.js (`WEB_COMPUTE`), so Amplify currently fails before running this repo's static build with `Cannot read 'next' version in package.json`. Open AWS CloudShell from the AWS console in the Region where the Amplify app lives and run:
+1. The Amplify app must use the static `WEB` platform. The existing app ID is `d1g6w5nbtfef3` in Stockholm. In AWS CloudShell, run:
 
    ```sh
-   aws amplify update-app --app-id YOUR_AMPLIFY_APP_ID --platform WEB --region YOUR_AWS_REGION
+   aws amplify update-app --app-id d1g6w5nbtfef3 --platform WEB --region eu-north-1
    ```
 
-   Find the app ID in the Amplify console URL (`/apps/d.../`). `WEB` is the AWS platform for a static site. Then retry the failed deployment. No local AWS CLI installation is needed.
-2. In the AWS CloudFormation console, create a stack by uploading [`infrastructure.yml`](infrastructure.yml). Acknowledge that it creates an IAM role. Use the same AWS account and Region as your other resources.
-3. When the stack finishes, copy its **LookupUrl** output. In the existing Amplify app, add an environment variable named `LOOKUP_URL` with that value, then redeploy the branch. The repo's `amplify.yml` builds the static site and writes the URL into `config.json`.
-4. In DynamoDB, open the table named in the stack's **TableName** output and create items. Each item needs a `code` String (uppercase letters, digits, `_` or `-`, up to 64 characters) and a `text` String. Example: `code = WELCOME`, `text = Your message here.`
+2. Create or update the CloudFormation stack with [`infrastructure.yml`](infrastructure.yml). It creates a DynamoDB table, a Lambda lookup and admin function, a public Function URL, and a Lambda IAM role that can read and add items. The template asks for `AdminPassword`; enter the password you chose for the `admin` account. No password is committed to GitHub. You can upload the template in the CloudFormation console, or upload it to CloudShell and run:
 
-The lookup endpoint is public because anyone visiting the site must be able to search. It permits only `GetItem` on this table and returns only the `text` field. Add or edit items in the DynamoDB console; the website has no write function. The table is retained if the CloudFormation stack is deleted so its contents are not accidentally removed.
+   ```sh
+   read -rsp 'Admin password: ' ADMIN_PASSWORD; echo
+   aws cloudformation deploy --template-file infrastructure.yml --stack-name aura-lookup \
+     --capabilities CAPABILITY_IAM --region eu-north-1 \
+     --parameter-overrides "AdminPassword=$ADMIN_PASSWORD"
+   unset ADMIN_PASSWORD
+   ```
 
-After setup, visit the Amplify site and search for `WELCOME`. Unknown codes display a simple not-found message.
+   If the stack already exists, this updates the Lambda function and permissions. CloudFormation masks the parameter in stack descriptions. Lambda receives it as an encrypted environment variable. Keep the password private.
 
+3. Copy the stack's `LookupUrl` output into the existing Amplify app as an environment variable named `LOOKUP_URL`, then redeploy `main`. The repo's [`amplify.yml`](amplify.yml) writes the URL into the published `config.json`.
+4. Open the site. Search for a code, or click **Admin access** near the lower right. Sign in with username `admin` and the password entered in step 2. Enter a code and text, then select **Save code**. Codes are converted to uppercase and may contain letters, digits, `_`, or `-` (up to 64 characters). Text can have up to 10,000 characters.
+
+The admin panel refuses duplicate codes. Each login lasts one hour in that browser tab. Adding a code takes effect immediately without redeploying the website. You can also manage items directly in the DynamoDB table named by the stack's `TableName` output. The table is retained if the stack is deleted.
+
+The Function URL is public so visitors can search. Only a valid admin session can write through it. The password is checked by Lambda and is never sent to visitors in the website files.
