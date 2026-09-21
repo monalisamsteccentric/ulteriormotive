@@ -4,7 +4,7 @@ Parameters:
   AdminPassword:
     Type: String
     NoEcho: true
-    MinLength: 10
+    MinLength: 7
     Description: Password for the admin account. Enter it when creating or updating the stack.
 Resources:
   CodesTable:
