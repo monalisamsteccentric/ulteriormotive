@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Public read-only code lookup backed by DynamoDB
+Resources:
+  CodesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: code
+          AttributeType: S
+      KeySchema:
+        - AttributeName: code
+          KeyType: HASH
+  LookupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ReadCodes
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:GetItem
+                Resource: !GetAtt CodesTable.Arn
+  LookupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: index.handler
+      Role: !GetAtt LookupRole.Arn
+      Timeout: 5
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CodesTable
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import re
+          import boto3
+
+          dynamodb = boto3.client('dynamodb')
+          table_name = os.environ['TABLE_NAME']
+
+          def reply(status, body):
+              return {
+                  'statusCode': status,
+                  'headers': {'content-type': 'application/json; charset=utf-8',
+                              'cache-control': 'no-store'},
+                  'body': json.dumps(body)
+              }
+
+          def handler(event, context):
+              code = (event.get('queryStringParameters') or {}).get('code', '')
+              if not isinstance(code, str) or not re.fullmatch(r'[A-Z0-9_-]{1,64}', code):
+                  return reply(400, {'error': 'Invalid code'})
+              try:
+                  response = dynamodb.get_item(
+                      TableName=table_name,
+                      Key={'code': {'S': code}},
+                      ProjectionExpression='#t',
+                      ExpressionAttributeNames={'#t': 'text'})
+              except Exception:
+                  print('DynamoDB lookup failed', flush=True)
+                  return reply(503, {'error': 'Lookup unavailable'})
+              value = response.get('Item', {}).get('text', {}).get('S')
+              if value is None:
+                  return reply(404, {'error': 'Code not found'})
+              return reply(200, {'text': value})
+  LookupUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt LookupFunction.Arn
+      AuthType: NONE
+      Cors:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+  PublicInvokeUrl:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LookupFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+  PublicInvokeFunction:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LookupFunction
+      Action: lambda:InvokeFunction
+      Principal: '*'
+      InvokedViaFunctionUrl: true
+Outputs:
+  LookupUrl:
+    Value: !GetAtt LookupUrl.FunctionUrl
+    Description: Set this value as LOOKUP_URL in Amplify environment variables.
+  TableName:
+    Value: !Ref CodesTable
+    Description: Add items with code (String) and text (String) in DynamoDB.

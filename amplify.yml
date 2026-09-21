@@ -1,22 +1,12 @@
 version: 1
 frontend:
   phases:
-    preBuild:
-      commands:
-        - nvm install 22
-        - nvm use 22
-        - npm ci
     build:
       commands:
-        - node scripts/amplify-env.mjs
-        - npm run typecheck
-        - npm test
-        - npm run build
+        - mkdir -p dist
+        - cp index.html styles.css app.js aura-background.jpg dist/
+        - printf '{"lookupUrl":"%s"}' "$LOOKUP_URL" > dist/config.json
   artifacts:
-    baseDirectory: .next
+    baseDirectory: dist
     files:
-      - "**/*"
-  cache:
-    paths:
-      - node_modules/**/*
-      - .next/cache/**/*
+      - '**/*'

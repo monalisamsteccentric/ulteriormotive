@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11100e">
+  <meta name="description" content="Enter a code to reveal its meaning.">
+  <title>Aura — The Code Reveals</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="scene">
+    <img class="artwork" src="/aura-background.jpg" alt="" aria-hidden="true">
+    <div class="mobile-heading" aria-hidden="true"><span>AURA</span><h1>THE CODE<br>REVEALS</h1></div>
+    <form id="lookup" class="lookup" autocomplete="off">
+      <label class="sr-only" for="code">Enter your code</label>
+      <span class="key" aria-hidden="true">⚿</span>
+      <input id="code" name="code" type="text" maxlength="64" placeholder="Enter your code..." required spellcheck="false" autocapitalize="characters" aria-describedby="message">
+      <button type="submit" aria-label="Reveal code"><span aria-hidden="true">→</span></button>
+    </form>
+    <section id="result" class="result" hidden aria-live="polite">
+      <p class="eyebrow">THE MEANING OF <span id="result-code"></span></p>
+      <p id="result-text" class="result-text"></p>
+    </section>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>
