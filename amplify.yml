@@ -4,7 +4,7 @@ frontend:
     build:
       commands:
         - mkdir -p dist
-        - cp index.html styles.css app.js aura-background.jpg dist/
+        - cp index.html styles.css app.js aura-background.jpg infrastructure.yml dist/
         - printf '{"lookupUrl":"%s"}' "$LOOKUP_URL" > dist/config.json
   artifacts:
     baseDirectory: dist

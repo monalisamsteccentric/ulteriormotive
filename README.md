@@ -10,9 +10,10 @@ A static code lookup page hosted by Amazon Amplify. Visitors search a code and r
    aws amplify update-app --app-id d1g6w5nbtfef3 --platform WEB --region eu-north-1
    ```
 
-2. Create or update the CloudFormation stack with [`infrastructure.yml`](infrastructure.yml). It creates a DynamoDB table, a Lambda lookup and admin function, a public Function URL, and a Lambda IAM role that can read and add items. The template asks for `AdminPassword`; enter the password you chose for the `admin` account. No password is committed to GitHub. You can upload the template in the CloudFormation console, or upload it to CloudShell and run:
+2. Create or update the CloudFormation stack with [`infrastructure.yml`](infrastructure.yml). It creates a DynamoDB table, a Lambda lookup and admin function, a public Function URL, and a Lambda IAM role that can read and add items. The template asks for `AdminPassword`; enter the password you chose for the `admin` account. No password is committed to GitHub. After the new site build succeeds, CloudShell can download the template directly from the site. Run:
 
    ```sh
+   curl -fsSL https://main.d1g6w5nbtfef3.amplifyapp.com/infrastructure.yml -o infrastructure.yml
    read -rsp 'Admin password: ' ADMIN_PASSWORD; echo
    aws cloudformation deploy --template-file infrastructure.yml --stack-name aura-lookup \
      --capabilities CAPABILITY_IAM --region eu-north-1 \
