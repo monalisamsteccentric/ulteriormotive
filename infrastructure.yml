@@ -1,12 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Public code lookup with password-protected admin publishing
+Description: Monalisa Thinks personal blog with private publishing, likes, and comments
 Parameters:
+  AdminUsername:
+    Type: String
+    Default: monalisa
+    MinLength: 1
+    MaxLength: 100
+    Description: Your private admin username. Change this when deploying if desired.
   AdminPassword:
     Type: String
     NoEcho: true
     MinLength: 7
-    Description: Password for the admin account. Enter it when creating or updating the stack.
+    Description: Set the admin password privately when creating or updating the stack.
 Resources:
+  # Retain the original table so updating the existing stack preserves its data.
   CodesTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
@@ -19,6 +26,25 @@ Resources:
       KeySchema:
         - AttributeName: code
           KeyType: HASH
+  BlogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expires
+        Enabled: true
   LookupRole:
     Type: AWS::IAM::Role
     Properties:
@@ -32,7 +58,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: ReadCodes
+        - PolicyName: BlogStorage
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -40,33 +66,51 @@ Resources:
                 Action:
                   - dynamodb:GetItem
                   - dynamodb:PutItem
-                Resource: !GetAtt CodesTable.Arn
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource: !GetAtt BlogTable.Arn
   LookupFunction:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.13
       Handler: index.handler
       Role: !GetAtt LookupRole.Arn
-      Timeout: 5
+      Timeout: 10
       MemorySize: 128
       Environment:
         Variables:
-          TABLE_NAME: !Ref CodesTable
+          TABLE_NAME: !Ref BlogTable
+          ADMIN_USERNAME: !Ref AdminUsername
           ADMIN_PASSWORD: !Ref AdminPassword
       Code:
         ZipFile: |
+          import base64
           import hashlib
           import hmac
           import json
           import os
           import re
           import time
+          import uuid
+          from datetime import datetime, timezone
+
           import boto3
-          
-          dynamodb = boto3.client('dynamodb')
-          table_name = os.environ['TABLE_NAME']
+          from botocore.exceptions import ClientError
+
+          db = boto3.client('dynamodb')
+          table = os.environ['TABLE_NAME']
+          admin_username = os.environ['ADMIN_USERNAME']
           admin_password = os.environ['ADMIN_PASSWORD']
-          
+          ID_PATTERN = r'[0-9]{20}-[a-f0-9]{8}'
+
+
+          class RequestError(Exception):
+              def __init__(self, status, message):
+                  self.status = status
+                  self.message = message
+
+
           def reply(status, body):
               return {
                   'statusCode': status,
@@ -74,100 +118,279 @@ Resources:
                               'cache-control': 'no-store'},
                   'body': json.dumps(body)
               }
-          
+
+
+          def key(pk, sk):
+              return {'pk': {'S': pk}, 'sk': {'S': sk}}
+
+
           def request_json(event):
               body = event.get('body') or ''
-              if len(body) > 25000:
-                  return None
               try:
-                  value = json.loads(body)
-                  return value if isinstance(value, dict) else None
-              except (TypeError, ValueError):
-                  return None
-          
+                  if event.get('isBase64Encoded'):
+                      body = base64.b64decode(body, validate=True).decode('utf-8')
+                  if len(body.encode('utf-8')) > 320000:
+                      raise RequestError(413, 'The article is too large.')
+                  data = json.loads(body)
+              except (ValueError, TypeError, UnicodeError):
+                  raise RequestError(400, 'Invalid request.')
+              if not isinstance(data, dict):
+                  raise RequestError(400, 'Invalid request.')
+              return data
+
+
+          def text_field(data, name, limit):
+              value = data.get(name)
+              if not isinstance(value, str) or not 1 <= len(value.strip()) <= limit:
+                  raise RequestError(400, 'Enter ' + name + ' of up to ' + str(limit) + ' characters.')
+              return value.strip()
+
+
           def token_is_valid(event):
-              headers = {key.lower(): value for key, value in
-                         (event.get('headers') or {}).items()}
-              authorization = headers.get('authorization', '')
-              if not authorization.startswith('Bearer '):
+              headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+              token = headers.get('authorization', '')
+              if not token.startswith('Bearer '):
                   return False
-              token = authorization[7:]
               try:
-                  expiry, signature = token.split('.', 1)
+                  expiry, nonce, signature = token[7:].split('.')
                   expires_at = int(expiry)
-              except (TypeError, ValueError):
+              except (ValueError, TypeError):
                   return False
-              if expires_at <= time.time() or expires_at > time.time() + 3600:
+              if not re.fullmatch(r'[a-f0-9]{32}', nonce):
                   return False
-              expected = hmac.new(admin_password.encode(), expiry.encode(),
-                                  hashlib.sha256).hexdigest()
+              if not time.time() < expires_at <= time.time() + 3600:
+                  return False
+              payload = admin_username + '|' + expiry + '.' + nonce
+              expected = hmac.new(admin_password.encode(), payload.encode(), hashlib.sha256).hexdigest()
               return hmac.compare_digest(signature, expected)
-          
-          def handler(event, context):
+
+
+          def require_admin(event):
+              if not token_is_valid(event):
+                  raise RequestError(401, 'Please sign in again.')
+
+
+          def source_hash(event):
+              source = (event.get('requestContext') or {}).get('http', {}).get('sourceIp', 'unknown')
+              return hmac.new(admin_password.encode(), source.encode(), hashlib.sha256).hexdigest()
+
+
+          def rate_limit(event, action, limit, seconds):
+              now = int(time.time())
+              try:
+                  db.update_item(
+                      TableName=table,
+                      Key=key('RATE#' + source_hash(event), action + '#' + str(now // seconds)),
+                      UpdateExpression='SET expires = :expires ADD attempts :one',
+                      ConditionExpression='attribute_not_exists(attempts) OR attempts < :limit',
+                      ExpressionAttributeValues={':expires': {'N': str(now + seconds * 2)},
+                                                 ':one': {'N': '1'}, ':limit': {'N': str(limit)}})
+              except db.exceptions.ConditionalCheckFailedException:
+                  raise RequestError(429, 'Please wait a moment before trying again.')
+
+
+          def article_item(article_id):
+              item = db.get_item(TableName=table, Key=key('ARTICLES', article_id),
+                                 ConsistentRead=True).get('Item')
+              if not item:
+                  raise RequestError(404, 'This article could not be found.')
+              return item
+
+
+          def serialize_article(item, full=False):
+              result = {
+                  'id': item['sk']['S'], 'title': item['title']['S'],
+                  'createdAt': item['createdAt']['S'], 'excerpt': item['excerpt']['S'],
+                  'likes': int(item.get('likes', {'N': '0'})['N']),
+                  'comments': int(item.get('comments', {'N': '0'})['N'])
+              }
+              if full:
+                  result['text'] = item['text']['S']
+              return result
+
+
+          def cursor_key(event, partition):
+              cursor = (event.get('queryStringParameters') or {}).get('cursor')
+              if not cursor:
+                  return {}
+              try:
+                  if len(cursor) > 1000:
+                      raise ValueError()
+                  decoded = json.loads(base64.urlsafe_b64decode(cursor).decode())
+                  if decoded.get('pk', {}).get('S') != partition:
+                      raise ValueError()
+                  if not re.fullmatch(ID_PATTERN, decoded.get('sk', {}).get('S', '')):
+                      raise ValueError()
+                  return {'ExclusiveStartKey': key(partition, decoded['sk']['S'])}
+              except (ValueError, TypeError, AttributeError, UnicodeError):
+                  raise RequestError(400, 'Invalid page. Please reload.')
+
+
+          def next_cursor(result):
+              last_key = result.get('LastEvaluatedKey')
+              if not last_key:
+                  return None
+              return base64.urlsafe_b64encode(json.dumps(last_key).encode()).decode()
+
+
+          def identifier():
+              return str(time.time_ns()).zfill(20) + '-' + uuid.uuid4().hex[:8]
+
+
+          def now_string():
+              return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+          def transaction_reason(error, index):
+              reasons = error.response.get('CancellationReasons') or []
+              return index < len(reasons) and reasons[index].get('Code') == 'ConditionalCheckFailed'
+
+
+          def handle(event):
               method = (event.get('requestContext') or {}).get('http', {}).get('method')
               path = event.get('rawPath', '/')
-          
+
               if method == 'POST' and path == '/admin/login':
                   data = request_json(event)
-                  if data is None:
-                      return reply(400, {'error': 'Invalid request'})
+                  rate_limit(event, 'LOGIN', 10, 300)
                   username = data.get('username')
                   password = data.get('password')
                   if not isinstance(username, str) or not isinstance(password, str):
-                      return reply(401, {'error': 'Invalid credentials'})
-                  valid_user = hmac.compare_digest(username, 'admin')
-                  valid_password = hmac.compare_digest(password, admin_password)
+                      raise RequestError(401, 'Incorrect username or password.')
+                  valid_user = hmac.compare_digest(username.encode(), admin_username.encode())
+                  valid_password = hmac.compare_digest(password.encode(), admin_password.encode())
                   if not (valid_user and valid_password):
-                      return reply(401, {'error': 'Invalid credentials'})
+                      raise RequestError(401, 'Incorrect username or password.')
                   expiry = str(int(time.time()) + 3600)
-                  signature = hmac.new(admin_password.encode(), expiry.encode(),
-                                       hashlib.sha256).hexdigest()
-                  return reply(200, {'token': expiry + '.' + signature})
-          
-              if method == 'POST' and path == '/admin/codes':
-                  if not token_is_valid(event):
-                      return reply(401, {'error': 'Sign in required'})
+                  nonce = uuid.uuid4().hex
+                  payload = admin_username + '|' + expiry + '.' + nonce
+                  signature = hmac.new(admin_password.encode(), payload.encode(), hashlib.sha256).hexdigest()
+                  return reply(200, {'token': expiry + '.' + nonce + '.' + signature})
+
+              edit = re.fullmatch(r'/admin/articles/(' + ID_PATTERN + ')', path)
+              if method == 'POST' and (path == '/admin/articles' or edit):
+                  require_admin(event)
                   data = request_json(event)
-                  if data is None:
-                      return reply(400, {'error': 'Invalid request'})
-                  code = data.get('code')
-                  value = data.get('text')
-                  if not isinstance(code, str) or not re.fullmatch(r'[A-Z0-9_-]{1,64}', code):
-                      return reply(400, {'error': 'Invalid code'})
-                  if not isinstance(value, str) or not 1 <= len(value.strip()) <= 10000:
-                      return reply(400, {'error': 'Invalid text'})
+                  title = text_field(data, 'title', 180)
+                  value = text_field(data, 'text', 50000)
+                  compact = re.sub(r'\s+', ' ', value)
+                  excerpt = compact[:180] + ('…' if len(compact) > 180 else '')
+                  if edit:
+                      article_id = edit[1]
+                      try:
+                          db.update_item(
+                              TableName=table, Key=key('ARTICLES', article_id),
+                              UpdateExpression='SET title = :title, #body = :body, excerpt = :excerpt',
+                              ConditionExpression='attribute_exists(pk)',
+                              ExpressionAttributeNames={'#body': 'text'},
+                              ExpressionAttributeValues={':title': {'S': title}, ':body': {'S': value},
+                                                         ':excerpt': {'S': excerpt}})
+                      except db.exceptions.ConditionalCheckFailedException:
+                          raise RequestError(404, 'This article could not be found.')
+                  else:
+                      article_id = identifier()
+                      item = key('ARTICLES', article_id)
+                      item.update({'title': {'S': title}, 'text': {'S': value}, 'excerpt': {'S': excerpt},
+                                   'createdAt': {'S': now_string()}, 'likes': {'N': '0'}, 'comments': {'N': '0'}})
+                      db.put_item(TableName=table, Item=item, ConditionExpression='attribute_not_exists(pk)')
+                  return reply(200 if edit else 201, {'id': article_id})
+
+              if method == 'GET' and path == '/articles':
+                  result = db.query(
+                      TableName=table, KeyConditionExpression='pk = :pk',
+                      ExpressionAttributeValues={':pk': {'S': 'ARTICLES'}},
+                      ProjectionExpression='sk, title, excerpt, createdAt, likes, comments',
+                      ScanIndexForward=False, Limit=20, ConsistentRead=True,
+                      **cursor_key(event, 'ARTICLES'))
+                  return reply(200, {'articles': [serialize_article(item) for item in result.get('Items', [])],
+                                     'nextCursor': next_cursor(result)})
+
+              match = re.fullmatch(r'/articles/(' + ID_PATTERN + r')(?:/(like|comments))?', path)
+              if match:
+                  article_id, action = match.groups()
+                  item = article_item(article_id)
+                  if method == 'GET' and not action:
+                      return reply(200, {'article': serialize_article(item, full=True)})
+                  if method == 'GET' and action == 'comments':
+                      partition = 'COMMENTS#' + article_id
+                      result = db.query(
+                          TableName=table, KeyConditionExpression='pk = :pk',
+                          ExpressionAttributeValues={':pk': {'S': partition}},
+                          ScanIndexForward=False, Limit=20, ConsistentRead=True,
+                          **cursor_key(event, partition))
+                      comments = [{'id': c['sk']['S'], 'name': c['name']['S'],
+                                   'text': c['text']['S'], 'createdAt': c['createdAt']['S']}
+                                  for c in result.get('Items', [])]
+                      return reply(200, {'comments': comments, 'nextCursor': next_cursor(result)})
+                  if method == 'POST' and action == 'like':
+                      data = request_json(event)
+                      visitor = data.get('visitorId')
+                      if not isinstance(visitor, str) or not re.fullmatch(
+                              r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', visitor):
+                          raise RequestError(400, 'Please reload before liking this article.')
+                      rate_limit(event, 'LIKE', 60, 3600)
+                      try:
+                          db.transact_write_items(TransactItems=[
+                              {'Put': {'TableName': table, 'Item': key('LIKES#' + article_id, visitor),
+                                       'ConditionExpression': 'attribute_not_exists(pk)'}},
+                              {'Update': {'TableName': table, 'Key': key('ARTICLES', article_id),
+                                          'UpdateExpression': 'ADD likes :one',
+                                          'ConditionExpression': 'attribute_exists(pk)',
+                                          'ExpressionAttributeValues': {':one': {'N': '1'}}}}
+                          ])
+                      except db.exceptions.TransactionCanceledException as error:
+                          if not transaction_reason(error, 0):
+                              raise
+                      return reply(200, {'likes': serialize_article(article_item(article_id))['likes']})
+                  if method == 'POST' and action == 'comments':
+                      data = request_json(event)
+                      if data.get('website'):
+                          raise RequestError(400, 'Could not post this comment.')
+                      name = text_field(data, 'name', 60)
+                      value = text_field(data, 'text', 2000)
+                      rate_limit(event, 'COMMENT', 1, 30)
+                      comment_id = identifier()
+                      comment = key('COMMENTS#' + article_id, comment_id)
+                      comment.update({'name': {'S': name}, 'text': {'S': value}, 'createdAt': {'S': now_string()}})
+                      db.transact_write_items(TransactItems=[
+                          {'Put': {'TableName': table, 'Item': comment, 'ConditionExpression': 'attribute_not_exists(pk)'}},
+                          {'Update': {'TableName': table, 'Key': key('ARTICLES', article_id),
+                                      'UpdateExpression': 'ADD comments :one',
+                                      'ConditionExpression': 'attribute_exists(pk)',
+                                      'ExpressionAttributeValues': {':one': {'N': '1'}}}}
+                      ])
+                      return reply(201, {'id': comment_id})
+
+              remove = re.fullmatch(r'/admin/articles/(' + ID_PATTERN + r')/comments/(' + ID_PATTERN + r')/remove', path)
+              if method == 'POST' and remove:
+                  require_admin(event)
+                  article_id, comment_id = remove.groups()
+                  article_item(article_id)
                   try:
-                      dynamodb.put_item(
-                          TableName=table_name,
-                          Item={'code': {'S': code}, 'text': {'S': value.strip()}},
-                          ConditionExpression='attribute_not_exists(#c)',
-                          ExpressionAttributeNames={'#c': 'code'})
-                  except dynamodb.exceptions.ConditionalCheckFailedException:
-                      return reply(409, {'error': 'Code already exists'})
-                  except Exception:
-                      print('DynamoDB write failed', flush=True)
-                      return reply(503, {'error': 'Save unavailable'})
-                  return reply(201, {'code': code})
-          
-              if method == 'GET' and path == '/':
-                  code = (event.get('queryStringParameters') or {}).get('code', '')
-                  if not isinstance(code, str) or not re.fullmatch(r'[A-Z0-9_-]{1,64}', code):
-                      return reply(400, {'error': 'Invalid code'})
-                  try:
-                      response = dynamodb.get_item(
-                          TableName=table_name,
-                          Key={'code': {'S': code}},
-                          ProjectionExpression='#t',
-                          ExpressionAttributeNames={'#t': 'text'})
-                  except Exception:
-                      print('DynamoDB lookup failed', flush=True)
-                      return reply(503, {'error': 'Lookup unavailable'})
-                  value = response.get('Item', {}).get('text', {}).get('S')
-                  if value is None:
-                      return reply(404, {'error': 'Code not found'})
-                  return reply(200, {'text': value})
-          
-              return reply(404, {'error': 'Not found'})
+                      db.transact_write_items(TransactItems=[
+                          {'Delete': {'TableName': table, 'Key': key('COMMENTS#' + article_id, comment_id),
+                                      'ConditionExpression': 'attribute_exists(pk)'}},
+                          {'Update': {'TableName': table, 'Key': key('ARTICLES', article_id),
+                                      'UpdateExpression': 'ADD comments :minus',
+                                      'ConditionExpression': 'attribute_exists(pk) AND comments > :zero',
+                                      'ExpressionAttributeValues': {':minus': {'N': '-1'}, ':zero': {'N': '0'}}}}
+                      ])
+                  except db.exceptions.TransactionCanceledException as error:
+                      if not transaction_reason(error, 0):
+                          raise
+                  return reply(200, {'removed': True})
+
+              raise RequestError(404, 'Not found.')
+
+
+          def handler(event, context):
+              try:
+                  return handle(event)
+              except RequestError as error:
+                  return reply(error.status, {'error': error.message})
+              except ClientError as error:
+                  print('Blog storage request failed: ' + error.response.get('Error', {}).get('Code', 'Unknown'), flush=True)
+                  return reply(503, {'error': 'The blog is temporarily unavailable. Please try again.'})
   LookupUrl:
     Type: AWS::Lambda::Url
     Properties:
@@ -201,5 +424,5 @@ Outputs:
     Value: !GetAtt LookupUrl.FunctionUrl
     Description: Set this value as LOOKUP_URL in Amplify environment variables.
   TableName:
-    Value: !Ref CodesTable
-    Description: Add items with code (String) and text (String) in DynamoDB.
+    Value: !Ref BlogTable
+    Description: Shared storage for articles, likes, and comments.

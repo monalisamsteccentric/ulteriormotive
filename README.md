@@ -1,31 +1,63 @@
-# Aura
+# Monalisa Thinks
 
-A static code lookup page hosted by Amazon Amplify. Visitors search a code and read its text. An admin panel lets you add codes after signing in. The website has no npm packages or local installation steps.
+A personal blog in the original dark gold style. The homepage lists article titles, newest first. Readers can open an article, like it, and leave a named comment. A small **Admin login** at the top right opens the private editor.
 
-## AWS setup
+The website remains plain HTML, CSS, and JavaScript, with no frontend packages or build tools required. Articles, likes, and comments are shared through the AWS Lambda and DynamoDB backend defined in [infrastructure.yml](infrastructure.yml).
 
-1. The Amplify app must use the static `WEB` platform. The existing app ID is `d1g6w5nbtfef3` in Stockholm. In AWS CloudShell, run:
+## Using the blog
+
+- Sign in using your privately configured admin username and password.
+- Enter an article title and write the article, then select **Publish article**. Paragraphs and line breaks are preserved. Titles support 180 characters; articles support 50,000 characters.
+- While signed in, open an article and select **Edit article** to update it. **New article** clears the editor for another post.
+- Visitors can like each article once per browser identity and comment without creating an account. Likes are deduplicated on the server; clearing browser storage creates a new identity.
+- Admins can remove unwanted comments. Public comments are immediately visible. Comments support a 60-character name and 2,000 characters of text.
+- The admin session lasts one hour and is kept in the current browser tab. Unauthenticated requests cannot publish, edit, or remove comments. Login attempts and public writes have rate limits.
+
+The username and password are configured on the server. The password is never included in the browser files or committed to this repository. There is one administrator account and no registration.
+
+## Deploy to the existing AWS site
+
+These changes require both a backend stack update and an Amplify redeploy. Updating just the static site is insufficient because the former backend supported code lookup.
+
+1. Upload **infrastructure.yml** to AWS CloudShell in **eu-north-1**. Update the existing stack to keep the existing Lambda Function URL:
 
    ```sh
-   aws amplify update-app --app-id d1g6w5nbtfef3 --platform WEB --region eu-north-1
-   ```
-
-2. Create or update the CloudFormation stack with [`infrastructure.yml`](infrastructure.yml). It creates a DynamoDB table, a Lambda lookup and admin function, a public Function URL, and a Lambda IAM role that can read and add items. The template asks for `AdminPassword`; enter the password you chose for the `admin` account. No password is committed to GitHub. After the new site build succeeds, CloudShell can download the template directly from the site. Run:
-
-   ```sh
-   curl -fsSL https://main.d1g6w5nbtfef3.amplifyapp.com/infrastructure.yml -o infrastructure.yml
-   read -rsp 'Admin password: ' ADMIN_PASSWORD; echo
+   read -rp 'Admin username: ' BLOG_ADMIN_USERNAME
+   read -rsp 'Admin password: ' BLOG_ADMIN_PASSWORD
+   echo
    aws cloudformation deploy --template-file infrastructure.yml --stack-name aura-lookup \
      --capabilities CAPABILITY_IAM --region eu-north-1 \
-     --parameter-overrides "AdminPassword=$ADMIN_PASSWORD"
-   unset ADMIN_PASSWORD
+     --parameter-overrides "AdminUsername=$BLOG_ADMIN_USERNAME" "AdminPassword=$BLOG_ADMIN_PASSWORD"
+   unset BLOG_ADMIN_USERNAME BLOG_ADMIN_PASSWORD
    ```
 
-   If the stack already exists, this updates the Lambda function and permissions. CloudFormation masks the parameter in stack descriptions. Lambda receives it as an encrypted environment variable. Keep the password private.
+   Enter your chosen credentials here privately. The template's default username is `monalisa` when no override is provided. The password is a required, masked CloudFormation parameter. The old code table is retained during the update; the blog has its own table.
 
-3. Copy the stack's `LookupUrl` output into the existing Amplify app as an environment variable named `LOOKUP_URL`, then redeploy `main`. The repo's [`amplify.yml`](amplify.yml) writes the URL into the published `config.json`.
-4. Open the site. Search for a code, or click **Admin access** near the lower right. Sign in with username `admin` and the password entered in step 2. Enter a code and text, then select **Save code**. Codes are converted to uppercase and may contain letters, digits, `_`, or `-` (up to 64 characters). Text can have up to 10,000 characters.
+2. Read the stack's **LookupUrl** output and use it as the existing Amplify app's **LOOKUP_URL** environment variable. The current app ID recorded by this repository is `d1g6w5nbtfef3`. The existing name is retained for deployment compatibility.
+3. Deploy the changed repository to the Amplify app's `main` branch. [amplify.yml](amplify.yml) publishes the static files and creates `config.json` with the backend URL.
+4. Open the site, sign in, and publish your first article. An empty blog shows an intentional “first thought is on its way” state.
 
-The admin panel refuses duplicate codes. Each login lasts one hour in that browser tab. Adding a code takes effect immediately without redeploying the website. You can also manage items directly in the DynamoDB table named by the stack's `TableName` output. The table is retained if the stack is deleted.
+The app must use Amplify's static `WEB` platform. Articles appear immediately after publishing without a website redeploy. The DynamoDB tables are retained if the stack is deleted.
 
-The Function URL is public so visitors can search. Only a valid admin session can write through it. The password is checked by Lambda and is never sent to visitors in the website files.
+## Local checks
+
+Python and Node.js are development tools only; visitors and the Amplify static build do not need them.
+
+```sh
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -p "test_*.py"
+node --check app.js
+cfn-lint infrastructure.yml
+python -m playwright install chromium
+python tests/browser_check.py
+```
+
+The backend tests use a mocked DynamoDB service with the actual inline Lambda code. The browser check serves the real static files locally and intercepts API requests with test data; it covers desktop and mobile navigation, publishing, edits, likes, comments, expired sessions, and literal rendering of untrusted content. Its screenshots are saved under the ignored `test-artifacts/` directory. These checks do not deploy or call a live AWS account.
+
+For a manual frontend preview, run `python -m http.server 8000 --bind 127.0.0.1` and open `http://localhost:8000`. Local publishing needs a configured HTTPS backend; the preview does not invent an admin password or save browser-only articles.
+
+## Artwork
+
+[blog-background.png](blog-background.png) is a text-free edit of the original [aura-background.jpg](aura-background.jpg), produced using the built-in imagegen tool. Final edit prompt: “Remove all lettering, navigation, slogans, symbols, and the input/search pill; reconstruct the dark sphere surface and landscape beneath. Preserve the central gold ring, mountains, platform, reflections, composition, and black and warm gold palette. No new objects, text, or UI.” The original image is preserved.
+
+AWS reference: [DynamoDB transaction permissions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis-iam.html) and [Lambda Function URL access](https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html).
