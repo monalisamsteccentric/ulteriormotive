@@ -4,7 +4,7 @@ frontend:
     build:
       commands:
         - mkdir -p dist
-        - cp index.html styles.css app.js blog-background.png infrastructure.yml dist/
+        - cp index.html styles.css app.js blog-background.png infrastructure.yml favicon.ico favicon.png apple-touch-icon.png dist/
         - printf '{"lookupUrl":"%s"}' "$LOOKUP_URL" > dist/config.json
   artifacts:
     baseDirectory: dist
