@@ -1,7 +1,8 @@
-dist/
-__pycache__/
-test-artifacts/
-config.json
-.env
-.env.*
-.venv/
+node_modules/
+.next/
+.local/
+.env*
+!.env.example
+*.tsbuildinfo
+test-results/
+next-env.d.ts
