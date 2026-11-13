@@ -1,24 +1,24 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { Match, PublicMatch } from './types';
 export class GameError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export function createMatch(hostId: string, title: string, topic: string, opponent: Match['opponent'], now = Date.now()): Match {
-  return { id: randomUUID(), title, topic, hostId, guestId: null, opponent, status: opponent === 'human' ? 'waiting' : 'live', messages: [], turn: 'a', votes: {}, votingEndsAt: null, createdAt: now, version: 1 };
+  return { id: randomUUID(), title, topic, hostId, guestId: null, opponent, ...(opponent === 'ai' ? { humanSeat: randomInt(2) === 0 ? 'a' as const : 'b' as const } : {}), status: opponent === 'human' ? 'waiting' : 'live', messages: [], turn: 'a', votes: {}, votingEndsAt: null, createdAt: now, version: 1 };
 }
-export function seatOf(m: Match, userId?: string): PublicMatch['seat'] { return userId === m.hostId ? 'a' : userId && userId === m.guestId ? 'b' : 'audience'; }
+export function seatOf(m: Match, userId?: string): PublicMatch['seat'] { return userId === m.hostId ? m.humanSeat || 'a' : userId && userId === m.guestId ? 'b' : 'audience'; }
 export function finishIfDue(m: Match, now = Date.now()) {
   if (m.status === 'voting' && m.votingEndsAt !== null && now >= m.votingEndsAt) { m.status = 'finished'; m.version++; }
 }
 export function viewMatch(m: Match, userId?: string, now = Date.now()): PublicMatch {
   // Read projection independently reflects the deadline; persisted settlement happens on normal API polling.
   const status = m.status === 'voting' && m.votingEndsAt !== null && now >= m.votingEndsAt ? 'finished' : m.status;
-  const values = Object.values(m.votes), humanVotes = values.filter((v) => v === 'human').length, aiVotes = values.length - humanVotes;
+  const values = Object.values(m.votes), humanVotes = values.filter((v) => m.humanSeat ? v === m.humanSeat : v === 'human').length, aiVotes = values.length - humanVotes;
   const identity = m.opponent === 'human' ? 'human' : 'ai';
-  const fooled = identity === 'human' ? aiVotes : humanVotes;
+  const fooled = m.humanSeat ? aiVotes : identity === 'human' ? aiVotes : humanVotes;
   return { id: m.id, title: m.title, topic: m.topic, status, messages: m.messages,
     seat: seatOf(m, userId), turn: m.turn, voteCount: values.length, myVote: userId ? m.votes[userId] || null : null,
     version: m.version, createdAt: m.createdAt, votingEndsAt: m.votingEndsAt,
-    canRetryOpponent: userId === m.hostId && m.opponent !== 'human' && m.status === 'live' && m.turn === 'b',
-    result: status !== 'finished' ? null : { identity, opponentLabel: m.opponent === 'practice' ? 'Scripted practice bot' : m.opponent === 'ollama' ? 'Local language model' : 'Human participant', humanVotes, aiVotes, fooled, winner: !values.length ? 'no-votes' : fooled * 2 === values.length ? 'draw' : fooled * 2 > values.length ? 'contender' : 'audience' },
+    canRetryOpponent: userId === m.hostId && m.opponent !== 'human' && m.status === 'live' && m.turn === botSeat(m), isHost: userId === m.hostId, ballot: m.humanSeat ? 'seat' : 'identity',
+    result: status !== 'finished' ? null : { humanSeat: m.humanSeat || null, identity, opponentLabel: m.opponent === 'practice' ? 'Scripted practice bot' : m.opponent === 'ollama' ? 'Local language model' : m.opponent === 'ai' ? 'AI language model' : 'Human participant', humanVotes, aiVotes, fooled, winner: !values.length ? 'no-votes' : fooled * 2 === values.length ? 'draw' : fooled * 2 > values.length ? 'contender' : 'audience' },
   };
 }
 export function joinMatch(m: Match, userId: string) {
@@ -40,8 +40,9 @@ export function openVoting(m: Match) {
   if (m.status !== 'live' || m.messages.length < 2) throw new GameError('Exchange at least two messages before opening the vote.', 409);
   m.status = 'voting'; m.votingEndsAt = Date.now() + 60000; m.version++;
 }
-export function vote(m: Match, userId: string, choice: 'human' | 'ai', now = Date.now()) {
+export function vote(m: Match, userId: string, choice: 'human' | 'ai' | 'a' | 'b', now = Date.now()) {
   if (m.status !== 'voting' || m.votingEndsAt === null || now >= m.votingEndsAt) throw new GameError('Voting is closed.', 409);
+  if (m.humanSeat ? !['a', 'b'].includes(choice) : !['human', 'ai'].includes(choice)) throw new GameError('Invalid ballot for this match.');
   if (seatOf(m, userId) !== 'audience') throw new GameError('Contenders cannot vote in their own match.', 403);
   if (m.votes[userId]) throw new GameError('Your ballot is already locked in.', 409);
   m.votes[userId] = choice; m.version++;
@@ -56,3 +57,5 @@ export function practiceReply(last: string, number: number): string {
   ];
   return /\?$/.test(last.trim()) && number === 0 ? 'Good question. I would start with the thing that feels a little embarrassing to admit. What would your answer be?' : replies[number % replies.length];
 }
+
+export function botSeat(m: Match): 'a' | 'b' { return m.humanSeat === 'b' ? 'a' : 'b'; }

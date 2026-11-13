@@ -54,3 +54,29 @@ test('local password hashes are salted; invalid and unknown account checks rejec
 test('practice bot is deterministic and bounded', () => {
   assert.equal(practiceReply('Hello', 1), practiceReply('Hello', 1)); assert.ok(practiceReply('Hello?', 0).length < 1500);
 });
+
+test('AI matches randomize the human seat and never expose it before reveal', () => {
+ const seats=new Set();
+ for(let i=0;i<64;i++) {
+  const m=createMatch('host','AI room','A meaningful conversation','ai'); seats.add(m.humanSeat);
+  const audience=viewMatch(m,'spectator');
+  assert.equal(audience.seat,'audience'); assert.equal(audience.ballot,'seat');
+  assert.equal(audience.result,null); assert.ok(!JSON.stringify(audience).includes('humanSeat'));
+  assert.equal(viewMatch(m,'host').seat,m.humanSeat);
+  assert.throws(()=>addMessage(m,'spectator','No','id'));
+ }
+ assert.equal(seats.size,2);
+});
+test('seat ballots require the correct mode and score correctly for either assignment', () => {
+ for(const humanSeat of ['a','b'] as const) {
+  const m=createMatch('host','AI room','A meaningful conversation','ai'); m.humanSeat=humanSeat;
+  m.status='voting'; m.votingEndsAt=Date.now()+60000;
+  assert.throws(()=>vote(m,'host','a')); assert.throws(()=>vote(m,'observer','human'));
+  vote(m,'observer',humanSeat); vote(m,'other',humanSeat);
+  assert.throws(()=>vote(m,'observer',humanSeat==='a'?'b':'a'));
+  assert.equal(viewMatch(m).result,null); finishIfDue(m,m.votingEndsAt);
+  assert.equal(viewMatch(m).result?.humanSeat,humanSeat);
+  assert.equal(viewMatch(m).result?.winner,'audience');
+  assert.equal(viewMatch(m).result?.fooled,0);
+ }
+});

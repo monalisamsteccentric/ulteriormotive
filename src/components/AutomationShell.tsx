@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import Link from '@/components/ProductLink';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 const nav = [['Solution', '/automation/solution'], ['Capabilities', '/automation/capabilities'], ['Architecture', '/automation/architecture'], ['Process', '/automation/process'], ['Engagement', '/automation/pricing']];

@@ -9,7 +9,7 @@ frontend:
       commands:
         # Amplify SSR only exposes env vars to the build; write the server ones to .env.production
         # so the Next.js compute runtime can read them. Never commit these values.
-        - env | grep -E '^(APP_ORIGIN|APP_ORIGINS|DATA_BACKEND|SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY|AI_MODE|ENABLE_SUBDOMAIN_ROUTING)=' >> .env.production
+        - node scripts/build-env.mjs
         - npm run build
   artifacts:
     baseDirectory: .next

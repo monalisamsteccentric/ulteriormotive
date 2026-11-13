@@ -24,21 +24,49 @@ export function rate(state: State, key: string, max: number, windowMs: number) {
 }
 export function tokenFrom(req: Request) { return req.headers.get('cookie')?.split(';').map((p) => p.trim()).find((p) => p.startsWith('um_session='))?.slice(11) || ''; }
 export async function currentUser(req: Request): Promise<User | null> {
-  const state = await readState(), session = state.sessions[hashToken(tokenFrom(req))];
+  const token = tokenFrom(req); if (!token) return null;
+  const key = hashToken(token);
+  let state = await readState(), session = state.sessions[key];
   if (!session || session.expiresAt <= Date.now()) return null;
   if (backend() === 'supabase') {
     if (!session.providerToken) return null;
+    if ((session.providerExpiresAt || 0) <= Date.now() + 60000) {
+      if (!session.refreshToken) return null;
+      const refresh = await mutate(s => {
+        const current = s.sessions[key];
+        if (!current || current.expiresAt <= Date.now() || (current.providerExpiresAt || 0) > Date.now() + 60000 || (current.refreshingUntil || 0) > Date.now()) return null;
+        current.refreshingUntil = Date.now() + 15000;
+        return current.refreshToken;
+      });
+      if (refresh) {
+        const { data, error } = await supabase(true).auth.refreshSession({ refresh_token: refresh });
+        await mutate(s => {
+          const current = s.sessions[key]; if (!current || current.refreshToken !== refresh) return;
+          if (error || !data.session || data.user?.id !== current.userId) { delete s.sessions[key]; return; }
+          current.providerToken = data.session.access_token; current.refreshToken = data.session.refresh_token;
+          current.providerExpiresAt = (data.session.expires_at || 0) * 1000; delete current.refreshingUntil;
+        });
+      } else {
+        for (let i = 0; i < 50; i++) {
+          const latest = (await readState()).sessions[key];
+          if (!latest || !latest.refreshingUntil || latest.refreshingUntil <= Date.now()) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+      state = await readState(); session = state.sessions[key];
+      if (!session || (session.providerExpiresAt || 0) <= Date.now()) return null;
+    }
     const { data, error } = await supabase(true).auth.getUser(session.providerToken);
     if (error || data.user?.id !== session.userId) return null;
   }
-  return state.users.find((u) => u.id === session.userId) || null;
+  return state.users.find(u => u.id === session.userId) || null;
 }
-export async function sessionFor(userId: string, providerToken?: string, providerExpiry?: number) {
+export async function sessionFor(userId: string, providerToken?: string, providerExpiry?: number, refreshToken?: string) {
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = Math.min(Date.now() + 12 * 3600000, providerExpiry ? providerExpiry * 1000 : Infinity);
-  await mutate((s) => {
+  const expiresAt = Date.now() + 7 * 86400000;
+  await mutate(s => {
     for (const [k, v] of Object.entries(s.sessions)) if (v.expiresAt <= Date.now()) delete s.sessions[k];
-    s.sessions[hashToken(token)] = { userId, expiresAt, providerToken };
+    s.sessions[hashToken(token)] = { userId, expiresAt, providerToken, refreshToken, providerExpiresAt: providerExpiry ? providerExpiry * 1000 : undefined };
   });
   return { token, expiresAt };
 }
