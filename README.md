@@ -62,7 +62,7 @@ Supabase Auth signup/login run on the server. Configure the existing project's A
 
 ## Enterprise product
 
-Eight pages cover the proposition, services, architecture, eight-step delivery lifecycle, indicative INR 15 lakh starting engagement, about and contact. No testimonials, clients, results or certifications are invented. Pricing is in INR without an unverified dollar conversion.
+Eight pages cover the proposition, services, architecture, eight-step delivery lifecycle, tailored enterprise engagement, about and contact. No testimonials, clients, results or certifications are invented. Pricing is in INR without an unverified dollar conversion.
 
 The inquiry form requires name, business email, company, role, business problem and project requirements, plus an empty honeypot. Server validation, actual streamed body size limit, exact origin checks and rate limiting precede private persistence. Success is returned only after storage succeeds. Email notifications are not implemented or implied. Notifications are not needed for persistence; an operator must review stored inquiries.
 
