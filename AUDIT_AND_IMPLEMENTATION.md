@@ -1,6 +1,6 @@
 # Ulterior Motive - audit and recovery
 
-Date: 13 November 2026, Asia/Calcutta. All work is local in `ulterior-motive`.
+Predeployment audit: 13 November 2026, Asia/Calcutta. The historical observations below describe the recovery before release. The user subsequently authorized deployment; see RELEASE_STATUS.md for current live status.
 
 ## Findings and evidence
 

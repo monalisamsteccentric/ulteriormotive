@@ -1,0 +1,27 @@
+ULTERIOR MOTIVE - LIVE STATUS
+============================
+Released 13 November 2026 (Asia/Calcutta).
+
+Game:       https://game.ulteriormotive.club
+Automation: https://automation.ulteriormotive.club
+Brand:      https://ulteriormotive.club
+
+Both products are deployed through the existing AWS Amplify app
+ d1g6w5nbtfef3, eu-north-1, main branch, deployment 55.
+Application release commit: e3740d8.
+
+DNS is already configured. No Namecheap changes are needed.
+The existing Supabase project woyxnowfyhiedyplcspb is preserved.
+Migration 002 is applied, RLS is enabled, and direct browser reads are denied.
+Email confirmation now redirects to the game domain.
+
+REMAINING AI CONFIGURATION
+--------------------------
+The existing OPENAI_API_KEY returns HTTP 401. Practice modes are live;
+real model-generated AI matches remain disabled until a valid key is saved.
+Replace OPENAI_API_KEY securely in the existing Amplify Environment variables.
+Set AI_MODE=openai and an enabled OPENAI_MODEL, then rebuild the main branch.
+Never paste keys into this file or commit them.
+
+For verified release details, tests and current limits see RELEASE_STATUS.md.
+The archived blog branch remains unchanged. Apex and www retain the brand page.

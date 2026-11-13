@@ -6,7 +6,7 @@ Two products in one Next.js App Router application, preserving AWS Amplify app `
 - `automation.ulteriormotive.club`: enterprise systems consultancy and private inquiry intake.
 - Apex and www: preserved brand doorway.
 
-This recovery is local source work. Nothing has been pushed, deployed, migrated remotely or changed in DNS. See AUDIT_AND_IMPLEMENTATION.md for evidence, verification and remaining release work. The older GO-LIVE-DNS-INSTRUCTIONS.txt is historical; DNS was already configured and was not changed here.
+Released on 13 November 2026 through existing Amplify deployment 55 (application commit e3740d8). Migration 002 is applied to the existing Supabase project. See RELEASE_STATUS.md for live verification and the remaining invalid-AI-key limitation. AUDIT_AND_IMPLEMENTATION.md records the predeployment audit. DNS was already configured and was not changed.
 
 ## Development
 
@@ -52,7 +52,7 @@ Existing NEXT_PUBLIC_SUPABASE_URL/ANON_KEY are accepted as a compatibility fallb
 
 ## Supabase migration and access
 
-The live database was inspected read-only: it exposes the existing `um_app_state` table, and anonymous raw-state reads are denied. Migration 001 is already installed; do not reset or recreate it. Review and apply **only** `supabase/migrations/002_relational_records.sql` to that same project when authorizing a release. It has not been applied remotely here.
+The live database was inspected read-only: it exposes the existing `um_app_state` table, and anonymous raw-state reads are denied. Migration 001 is already installed; do not reset or recreate it. The release applied `supabase/migrations/002_relational_records.sql` to that same project. It was applied to the existing project during the authorized release; do not apply it a second time.
 
 002 adds indexed, constrained relational records for profiles, matches, participants, messages, votes, results and inquiries. A PostgreSQL trigger projects each successful compare-and-swap state update into those tables in the SAME transaction and backfills existing records without deleting or replacing JSON state. Invalid projections roll back the state update. Duplicate ballots have a composite primary key, participant ballots are rejected, and identities/messages/ballots are immutable in the projection. Historical inquiry role/requirements may be null; new submissions require them at the API boundary.
 
@@ -68,6 +68,6 @@ The inquiry form requires name, business email, company, role, business problem 
 
 ## Release limits
 
-The shared CAS state is deliberately preserved for data compatibility. Every mutation still reads/writes the aggregate; normalized projections improve constraints and inspection but do not remove this throughput bottleneck. This implementation has not been load-certified. Plan a separate transactional per-match storage migration before substantial traffic. Polling is bounded synchronization, not push Realtime. One account does not prove one human; moderation, bot resistance, retention and support processes remain operator responsibilities. Live AI validation is blocked by the invalid key, and remote Auth was not tested by creating production accounts. Do not describe unverified external paths as passing.
+The shared CAS state is deliberately preserved for data compatibility. Every mutation still reads/writes the aggregate; normalized projections improve constraints and inspection but do not remove this throughput bottleneck. This implementation has not been load-certified. Plan a separate transactional per-match storage migration before substantial traffic. Polling is bounded synchronization, not push Realtime. One account does not prove one human; moderation, bot resistance, retention and support processes remain operator responsibilities. Live AI validation is blocked by the invalid key. Supabase-backed login, identity validation, persistent cookies and logout were verified with temporary accounts; actual confirmation-email delivery and time-expired token rotation were not exercised live. Do not describe unverified external paths as passing.
 
-Production hostname behavior must be checked after an explicitly authorized Amplify deployment. Local tests emulate those hosts and forwarded headers; they are not a production deployment verification.
+Production hostname routing and real browser navigation were verified after Amplify deployment 55. See RELEASE_STATUS.md for the exact live verification scope.
